@@ -1,0 +1,48 @@
+# Flutter / Dart
+.dart_tool/
+build/
+.pub/
+.packages
+
+# IDE
+.idea/
+*.iml
+
+# Generated Flutter files
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Unity generated files
+unity_source/**/Library/
+unity_source/**/Logs/
+unity_source/**/UserSettings/
+unity_source/**/Temp/
+unity_source/**/Obj/
+
+# Generated Unity WebGL build
+unity_source/livescreenwebbuild/Build/
+unity_source/livescreenwebbuild/TemplateData/
+
+# Flutter generated
+**/ephemeral/
+
+# Old/duplicate Unity project
+unity_source/LiveScreenVenue/My project/
+
+# Visual Studio
+.vs/
+**/.vs/
+
+# Flutter machine-specific
+android/local.properties
