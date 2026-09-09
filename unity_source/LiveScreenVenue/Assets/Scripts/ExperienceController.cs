@@ -77,7 +77,12 @@ public class ExperienceController : MonoBehaviour
         Quaternion targetRotation = CalculateLookAtScreenRotation(targetPosition);
 
         if (_transitionCoroutine != null) StopCoroutine(_transitionCoroutine);
-        _transitionCoroutine = StartCoroutine(TransitionCamera(targetPosition, targetRotation, _venueGenerator.Parameters.experienceFieldOfView));
+        _transitionCoroutine = StartCoroutine(TransitionCamera(targetPosition, targetRotation, _venueGenerator.Parameters.experienceFieldOfView, onComplete: () =>
+        {
+            // Only once the camera has actually arrived — not on button
+            // press — so screen audio starts in sync with the seated view.
+            SpatialAudioManager.Instance?.OnEnteredSeat(seat);
+        }));
 
         Debug.Log($"Entering experience at seat {seat.Id}, eye position {targetPosition}");
     }
@@ -99,6 +104,7 @@ public class ExperienceController : MonoBehaviour
             {
                 _orbitCamera.AllowMovement = true;
             }
+            SpatialAudioManager.Instance?.OnExitedSeat();
         }));
 
         FlutterBridge.NotifyFlutter("experience_exited:" + exitedSeatId);

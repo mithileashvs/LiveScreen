@@ -27,6 +27,19 @@ public class OrbitCamera : MonoBehaviour
 
     private void Start()
     {
+        // "Outside the theatre" renders as the SAME color as the theatre's
+        // own walls (not pure black) — so there's no visible seam/edge
+        // where the walls end, per your request that users shouldn't be
+        // able to tell where the theatre stops and the environment starts.
+        // Sourced from RoomGenerator.WallColor rather than a separate
+        // literal, so the two can never drift out of sync.
+        var cam = GetComponent<Camera>();
+        if (cam != null)
+        {
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = RoomGenerator.WallColor;
+        }
+
         Vector3 angles = transform.eulerAngles;
         _yaw = angles.y;
         _pitch = angles.x;

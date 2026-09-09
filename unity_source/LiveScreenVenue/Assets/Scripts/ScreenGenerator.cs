@@ -20,6 +20,13 @@ public static class ScreenGenerator
         screen.transform.localScale = new Vector3(p.screenWidth, p.screenHeight, 0.05f);
 
         Material screenMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.9f, 0.9f, 0.95f) };
+        // A real cinema screen is a matte, diffuse projection surface, not
+        // reflective — without this, the Standard shader's default glossy
+        // finish picks up a visible specular highlight "hot spot" from
+        // ScreenGlowLight (and any nearby ceiling lights), which shows up
+        // as a bright circle on the screen.
+        if (screenMaterial.HasProperty("_Glossiness")) screenMaterial.SetFloat("_Glossiness", 0.02f);
+        if (screenMaterial.HasProperty("_Metallic")) screenMaterial.SetFloat("_Metallic", 0f);
         if (screenMaterial.HasProperty("_EmissionColor"))
         {
             screenMaterial.EnableKeyword("_EMISSION");

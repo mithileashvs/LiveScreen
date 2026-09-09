@@ -59,8 +59,10 @@
     <Compile Include="Assets\Scripts\ExperienceSession.cs" />
     <Compile Include="Assets\Scripts\VenueGeneratorUI.cs" />
     <Compile Include="Assets\Scripts\CinemaSeatBuilder.cs" />
+    <Compile Include="Assets\Scripts\SpatialAudioManager.cs" />
     <Compile Include="Assets\Scripts\VenueGenerator.cs" />
     <Compile Include="Assets\Scripts\SeatGenerator.cs" />
+    <Compile Include="Assets\Scripts\ProceduralTone.cs" />
     <Compile Include="Assets\Scripts\VenueParameters.cs" />
     <Compile Include="Assets\Scripts\FlutterBridge.cs" />
     <Compile Include="Assets\Scripts\SeatData.cs" />

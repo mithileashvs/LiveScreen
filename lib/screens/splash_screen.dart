@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'main_nav_screen.dart';
+import '../auth/screens/login_screen.dart';
 
 /// The very first screen the user sees when opening LiveScreen.
 /// Shows the logo and tagline with a simple fade-in animation,
@@ -34,11 +34,13 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // After the delay, move to the main app (bottom nav container).
+    // After the delay, move to the login screen (PART 9: Launch -> Splash ->
+    // Login -> role-based routing). Previously this went straight to
+    // MainNavScreen; that's now only reached after a successful login.
     Timer(const Duration(milliseconds: 2400), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavScreen()),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       }
     });

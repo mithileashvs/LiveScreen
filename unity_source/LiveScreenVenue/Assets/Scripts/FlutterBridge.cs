@@ -38,6 +38,71 @@ public class FlutterBridge : MonoBehaviour
     }
 
     /// <summary>
+    /// Called by Flutter (via load_configuration:&lt;json&gt;) before
+    /// ExperienceSeatById, when a real TheatreConfiguration exists — see
+    /// TheatreUnityBridge.toUnityVenueParametersJson on the Dart side for
+    /// exactly what's in the JSON and why.
+    ///
+    /// Only overwrites the specific room/screen/seating-layout fields
+    /// Flutter actually sends; everything else this scene has configured
+    /// (lighting, aisle count, headroom, eye heights, etc.) is left alone.
+    /// Regenerates the venue afterward so the change actually takes visual
+    /// effect, then acks so Flutter knows it's safe to send the seat
+    /// command — sending the seat command before this finishes could have
+    /// the camera arrive at a seat position computed from the WRONG,
+    /// stale room dimensions.
+    /// </summary>
+    public void LoadConfiguration(string json)
+    {
+        Debug.Log($"[FlutterBridge] Received theatre configuration: {json}");
+
+        VenueGenerator venueGenerator = VenueGenerator.Instance;
+        if (venueGenerator == null)
+        {
+            Debug.LogWarning("[FlutterBridge] No VenueGenerator found — cannot apply configuration.");
+            NotifyFlutter("configuration_loaded");
+            return;
+        }
+
+        VenueParameters incoming;
+        try
+        {
+            incoming = JsonUtility.FromJson<VenueParameters>(json);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[FlutterBridge] Could not parse configuration JSON: {e.Message}");
+            NotifyFlutter("configuration_loaded");
+            return;
+        }
+
+        if (incoming == null)
+        {
+            Debug.LogWarning("[FlutterBridge] Configuration JSON parsed to null.");
+            NotifyFlutter("configuration_loaded");
+            return;
+        }
+
+        VenueParameters p = venueGenerator.Parameters;
+        p.roomWidth = incoming.roomWidth;
+        p.roomLength = incoming.roomLength;
+        p.roomHeight = incoming.roomHeight;
+        p.screenWidth = incoming.screenWidth;
+        p.screenHeight = incoming.screenHeight;
+        p.rows = incoming.rows;
+        p.seatsPerRow = incoming.seatsPerRow;
+        p.seatSpacing = incoming.seatSpacing;
+        p.rowSpacing = incoming.rowSpacing;
+        p.seatWidth = incoming.seatWidth;
+        p.firstRowDistanceFromScreen = incoming.firstRowDistanceFromScreen;
+        p.rowRisePerRow = incoming.rowRisePerRow;
+
+        venueGenerator.Generate();
+
+        NotifyFlutter("configuration_loaded");
+    }
+
+    /// <summary>
     /// Called by Flutter when the user taps "Experience This Seat" on a
     /// given seat ID. Reuses the exact same VenueGenerator/ExperienceController
     /// systems Phase 2 and 3 already built — no duplicate logic here.

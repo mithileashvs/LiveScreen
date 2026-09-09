@@ -104,12 +104,32 @@ public static class SeatGenerator
     /// edges. This is intentionally conservative (worst case for curved
     /// arrangement) rather than pixel-perfect.
     /// </summary>
+    /// <summary>
+    /// Estimates the minimum room footprint (width, length, height) needed to
+    /// fully enclose every seat this venue will generate, plus a safety
+    /// margin — AND to fully enclose the configured screen. This is the
+    /// exact bug behind the "grey hole above the screen": with the
+    /// defaults (screenHeightFromFloor 2m + screenHeight 8m = a screen top
+    /// edge at 10m) the ceiling used to be auto-sized purely from the
+    /// seating (8m default), so the screen — and its bezel — physically
+    /// poked straight through the ceiling into the void above, and that
+    /// void is what showed through as a grey/blue patch (Unity's default
+    /// skybox, still visible through the gap). Factoring the screen in
+    /// here means the ceiling/walls can never end up smaller than the
+    /// screen itself, for any configuration.
+    /// </summary>
     public static Vector3 EstimateRequiredRoomBounds(VenueParameters p)
     {
         int lastRow = Mathf.Max(0, p.rows - 1);
 
         float requiredLength = ComputeRowDepth(lastRow, p) + p.roomSafetyMargin;
-        float requiredHeight = ComputeRowHeight(lastRow, p) + p.ceilingHeadroom;
+
+        float seatingRequiredHeight = ComputeRowHeight(lastRow, p) + p.ceilingHeadroom;
+        // ScreenGenerator's bezel is drawn 0.5m taller/wider than the screen
+        // itself (see ScreenGenerator.BuildBezel) — matched here so the
+        // bezel can't poke through either, not just the screen panel.
+        float screenTopEdge = p.screenHeightFromFloor + p.screenHeight + 0.5f;
+        float requiredHeight = Mathf.Max(seatingRequiredHeight, screenTopEdge + p.ceilingHeadroom);
 
         float halfWidth;
         if (p.arrangement == SeatArrangement.Curved)
@@ -124,6 +144,10 @@ public static class SeatGenerator
             float aisleExtra = Mathf.Max(0, p.aisleCount) * p.aisleWidth;
             halfWidth = (rowWidth / 2f) + aisleExtra;
         }
+
+        // The screen (plus its 0.5m bezel margin) must also fit within the
+        // walls' width, same reasoning as the height check above.
+        halfWidth = Mathf.Max(halfWidth, (p.screenWidth + 0.5f) / 2f);
 
         float requiredWidth = (halfWidth * 2f) + p.roomSafetyMargin;
 

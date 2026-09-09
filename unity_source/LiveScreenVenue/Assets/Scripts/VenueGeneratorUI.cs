@@ -56,12 +56,26 @@ public class VenueGeneratorUI : MonoBehaviour
     private void OnGUI()
     {
         // While the seat experience is active, show only the minimal
-        // experience overlay instead of the full generator panel.
+        // experience overlay instead of the full generator panel — this
+        // applies in both the Editor and real builds, since a seat label
+        // is legitimate end-user UI, not a dev tool.
         if (ExperienceController.Instance != null && ExperienceController.Instance.IsExperienceActive)
         {
             DrawExperienceOverlay();
             return;
         }
+
+#if !UNITY_EDITOR
+        // The full parameter-editing panel below (Regenerate Venue / Export
+        // JSON / Length, Width, Height fields, etc.) is a development tool
+        // for tuning a venue's numbers while building it — not something a
+        // real user should ever see, including in the gap between Unity
+        // finishing loading and Flutter's "experience_seat:<id>" message
+        // arriving. VenueGenerator.Start() already builds the theatre on
+        // its own regardless of whether this UI exists, so hiding it here
+        // doesn't affect the actual venue.
+        return;
+#endif
 
         float panelWidth = 340;
         float panelHeight = 300 + (_showCurved ? 24 : 0) + (string.IsNullOrEmpty(_exportStatusMessage) ? 0 : 30) + 15;

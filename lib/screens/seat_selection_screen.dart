@@ -4,7 +4,6 @@ import '../models/event.dart';
 import '../models/venue.dart';
 import '../models/seat.dart';
 import '../data/demo_data.dart';
-import 'seat_experience_screen.dart';
 import 'unity_experience_screen.dart';
 import 'booking_summary_screen.dart';
 

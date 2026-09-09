@@ -10,6 +10,10 @@ class EventModel {
   final String description;
   final List<String> venueIds;
 
+  /// Out of 10. Optional/defaulted so this stays backward compatible with
+  /// every existing EventModel(...) call site.
+  final double rating;
+
   const EventModel({
     required this.id,
     required this.title,
@@ -20,5 +24,6 @@ class EventModel {
     required this.language,
     required this.description,
     required this.venueIds,
+    this.rating = 8.0,
   });
 }

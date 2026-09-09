@@ -1,19 +1,10 @@
 using UnityEngine;
 
-/// <summary>
-/// A simple on-screen control panel using Unity's built-in "IMGUI" system.
-/// This deliberately avoids needing you to manually build a Canvas/UI in
-/// the Editor — just attach this script next to VenueGenerator and it works.
-///
-/// Not final visual design — Phase 2 is about correct generation logic first.
-/// </summary>
 [RequireComponent(typeof(VenueGenerator))]
 public class VenueGeneratorUI : MonoBehaviour
 {
     private VenueGenerator _generator;
 
-    // Text field buffers (IMGUI text fields work with strings, so we
-    // convert to/from numbers when Generate is pressed).
     private string _length, _width, _height;
     private string _screenWidth, _screenHeight;
     private string _rows, _seatsPerRow;
@@ -24,7 +15,6 @@ public class VenueGeneratorUI : MonoBehaviour
     private bool _showCurved;
     private string _exportStatusMessage = "";
 
-    // Reusable 1x1 colored textures for the legend swatches.
     private Texture2D _standardSwatch, _premiumSwatch, _reclinerSwatch;
 
     private void Start()
@@ -65,48 +55,50 @@ public class VenueGeneratorUI : MonoBehaviour
 
     private void OnGUI()
     {
-        float panelHeight = (_showCurved ? 470 : 440) + 90; // extra room for export button + status text
-        GUI.Box(new Rect(10, 10, 260, panelHeight), "");
-        GUILayout.BeginArea(new Rect(20, 20, 240, panelHeight - 20));
+        // While the seat experience is active, show only the minimal
+        // experience overlay instead of the full generator panel.
+        if (ExperienceController.Instance != null && ExperienceController.Instance.IsExperienceActive)
+        {
+            DrawExperienceOverlay();
+            return;
+        }
+
+        float panelWidth = 340;
+        float panelHeight = 300 + (_showCurved ? 24 : 0) + (string.IsNullOrEmpty(_exportStatusMessage) ? 0 : 30) + 15;
+
+        GUI.Box(new Rect(10, 10, panelWidth, panelHeight), "");
+        GUILayout.BeginArea(new Rect(20, 20, panelWidth - 20, panelHeight - 20));
 
         GUILayout.Label("LIVESCREEN VENUE GENERATOR", GUI.skin.box);
+        GUILayout.Space(6);
 
-        GUILayout.Label("Auditorium Length (m)");
-        _length = GUILayout.TextField(_length);
+        GUILayout.BeginHorizontal();
 
-        GUILayout.Label("Auditorium Width (m)");
-        _width = GUILayout.TextField(_width);
+        GUILayout.BeginVertical(GUILayout.Width(150));
+        FieldRow("Length (m)", ref _length);
+        FieldRow("Width (m)", ref _width);
+        FieldRow("Height (m)", ref _height);
+        FieldRow("Screen W (m)", ref _screenWidth);
+        FieldRow("Screen H (m)", ref _screenHeight);
+        GUILayout.EndVertical();
 
-        GUILayout.Label("Auditorium Height (m)");
-        _height = GUILayout.TextField(_height);
+        GUILayout.Space(10);
 
-        GUILayout.Label("Screen Width (m)");
-        _screenWidth = GUILayout.TextField(_screenWidth);
+        GUILayout.BeginVertical(GUILayout.Width(150));
+        FieldRow("Rows", ref _rows);
+        FieldRow("Seats/Row", ref _seatsPerRow);
+        FieldRow("Seat Gap (m)", ref _seatSpacing);
+        FieldRow("Row Gap (m)", ref _rowSpacing);
+        FieldRow("Aisles (0-2)", ref _aisleCount);
+        GUILayout.EndVertical();
 
-        GUILayout.Label("Screen Height (m)");
-        _screenHeight = GUILayout.TextField(_screenHeight);
-
-        GUILayout.Label("Rows");
-        _rows = GUILayout.TextField(_rows);
-
-        GUILayout.Label("Seats per Row");
-        _seatsPerRow = GUILayout.TextField(_seatsPerRow);
-
-        GUILayout.Label("Seat Spacing (m)");
-        _seatSpacing = GUILayout.TextField(_seatSpacing);
-
-        GUILayout.Label("Row Spacing (m)");
-        _rowSpacing = GUILayout.TextField(_rowSpacing);
-
-        GUILayout.Label("Aisle Count (0-2)");
-        _aisleCount = GUILayout.TextField(_aisleCount);
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(6);
         _showCurved = GUILayout.Toggle(_showCurved, " Curved seating");
         if (_showCurved)
         {
-            GUILayout.Label("Curve Radius (m)");
-            _curveRadius = GUILayout.TextField(_curveRadius);
+            FieldRow("Curve Radius (m)", ref _curveRadius);
         }
 
         GUILayout.Space(10);
@@ -117,10 +109,10 @@ public class VenueGeneratorUI : MonoBehaviour
         }
 
         GUILayout.Space(6);
-        if (GUILayout.Button("Export Venue Data (JSON)", GUILayout.Height(28)))
+        if (GUILayout.Button("Export Venue Data (JSON)", GUILayout.Height(26)))
         {
             string path = VenueDataExporter.ExportToJson(_generator);
-            _exportStatusMessage = $"Saved to:\n{path}";
+            _exportStatusMessage = "Saved: venue_data.json (see Console for full path)";
         }
 
         if (!string.IsNullOrEmpty(_exportStatusMessage))
@@ -130,13 +122,21 @@ public class VenueGeneratorUI : MonoBehaviour
 
         GUILayout.EndArea();
 
-        DrawLegend();
+        DrawLegend(panelHeight);
         DrawSelectedSeatPanel();
     }
 
-    private void DrawLegend()
+    private void FieldRow(string label, ref string value)
     {
-        Rect legendRect = new Rect(10, Screen.height - 100, 200, 90);
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(label, GUILayout.Width(90));
+        value = GUILayout.TextField(value, GUILayout.Width(50));
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawLegend(float mainPanelHeight)
+    {
+        Rect legendRect = new Rect(10, 20 + mainPanelHeight, 200, 90);
         GUI.Box(legendRect, "");
         GUILayout.BeginArea(new Rect(legendRect.x + 10, legendRect.y + 8, 180, 80));
 
@@ -161,7 +161,7 @@ public class VenueGeneratorUI : MonoBehaviour
         if (_generator.SelectedSeat == null) return;
 
         var seat = _generator.SelectedSeat;
-        float panelHeight = 140;
+        float panelHeight = 180;
         Rect panelRect = new Rect(Screen.width - 270, 10, 260, panelHeight);
 
         GUI.Box(panelRect, "");
@@ -170,6 +170,41 @@ public class VenueGeneratorUI : MonoBehaviour
         GUILayout.Label($"Position: ({seat.Position.x:F2}, {seat.Position.y:F2}, {seat.Position.z:F2})");
         GUILayout.Label($"Rotation Y: {seat.Rotation.eulerAngles.y:F1}°");
         GUILayout.Label($"Type: {seat.Type}");
+
+        GUILayout.Space(8);
+        if (GUILayout.Button("Experience This Seat", GUILayout.Height(30)))
+        {
+            ExperienceController.Instance?.EnterExperience(seat);
+        }
+
+        GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// The minimal overlay shown while the user is "sitting" in a seat —
+    /// deliberately sparse so it doesn't distract from the 3D view (spec section 9).
+    /// </summary>
+    private void DrawExperienceOverlay()
+    {
+        var session = ExperienceController.Instance.CurrentSession;
+        if (session == null) return;
+
+        float panelWidth = 220;
+        Rect topRect = new Rect((Screen.width - panelWidth) / 2f, 20, panelWidth, 70);
+
+        GUI.Box(topRect, "");
+        GUILayout.BeginArea(new Rect(topRect.x + 10, topRect.y + 8, panelWidth - 20, 54));
+        GUILayout.Label("LIVESCREEN", GUI.skin.box);
+        GUILayout.Label($"Seat {session.SeatId}", GUI.skin.label);
+        GUILayout.EndArea();
+
+        Rect exitRect = new Rect((Screen.width - 180) / 2f, Screen.height - 70, 180, 44);
+        GUI.Box(exitRect, "");
+        GUILayout.BeginArea(exitRect);
+        if (GUILayout.Button("Exit Experience", GUILayout.Height(40)))
+        {
+            ExperienceController.Instance.ExitExperience();
+        }
         GUILayout.EndArea();
     }
 
@@ -191,6 +226,13 @@ public class VenueGeneratorUI : MonoBehaviour
         p.arrangement = _showCurved ? SeatArrangement.Curved : SeatArrangement.Straight;
 
         _generator.Generate();
+
+        // RoomGenerator may have auto-expanded roomLength/Width/Height to
+        // guarantee full enclosure of the seating layout (see
+        // RoomGenerator.EnsureRoomFitsSeating) — re-sync the displayed
+        // numbers so the venue owner can see the corrected values instead
+        // of the panel silently disagreeing with what's on screen.
+        SyncFieldsFromParameters();
     }
 
     private float ParseOr(string text, float fallback)

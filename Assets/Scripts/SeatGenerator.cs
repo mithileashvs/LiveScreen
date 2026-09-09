@@ -27,8 +27,8 @@ public static class SeatGenerator
             string rowLabel = GetRowLabel(rowIndex);
 
             // Distance of this row from the screen (front-to-back).
-            float rowDepth = p.firstRowDistanceFromScreen + (rowIndex * p.rowSpacing);
-            float rowHeight = rowIndex * p.rowRisePerRow; // slight stadium-style rise
+            float rowDepth = ComputeRowDepth(rowIndex, p);
+            float rowHeight = ComputeRowHeight(rowIndex, p); // slight stadium-style rise
 
             SeatType rowSeatType = DetermineSeatType(rowIndex, p.rows);
 
@@ -72,6 +72,62 @@ public static class SeatGenerator
         }
 
         return allSeats;
+    }
+
+    /// <summary>
+    /// How far row <paramref name="rowIndex"/> is from the screen, front-to-back.
+    /// This is the SINGLE source of truth for row depth — RoomGenerator's floor
+    /// risers use this exact same formula so the solid ground under a row and
+    /// the seats sitting on it can never drift out of sync.
+    /// </summary>
+    public static float ComputeRowDepth(int rowIndex, VenueParameters p)
+    {
+        return p.firstRowDistanceFromScreen + (rowIndex * p.rowSpacing);
+    }
+
+    /// <summary>
+    /// How high row <paramref name="rowIndex"/> sits above the base floor
+    /// (the gentle stadium-style rise). Same single-source-of-truth reasoning
+    /// as <see cref="ComputeRowDepth"/> — RoomGenerator's risers read this too.
+    /// </summary>
+    public static float ComputeRowHeight(int rowIndex, VenueParameters p)
+    {
+        return rowIndex * p.rowRisePerRow;
+    }
+
+    /// <summary>
+    /// Estimates the minimum room footprint (width, length, height) needed to
+    /// fully enclose every seat this venue will generate, plus a safety
+    /// margin. RoomGenerator calls this before laying out walls/ceiling so
+    /// the auditorium can NEVER end up smaller than the seating it has to
+    /// contain — which is what would expose the open skybox around the
+    /// edges. This is intentionally conservative (worst case for curved
+    /// arrangement) rather than pixel-perfect.
+    /// </summary>
+    public static Vector3 EstimateRequiredRoomBounds(VenueParameters p)
+    {
+        int lastRow = Mathf.Max(0, p.rows - 1);
+
+        float requiredLength = ComputeRowDepth(lastRow, p) + p.roomSafetyMargin;
+        float requiredHeight = ComputeRowHeight(lastRow, p) + p.ceilingHeadroom;
+
+        float halfWidth;
+        if (p.arrangement == SeatArrangement.Curved)
+        {
+            // Worst case: the back row's arc radius, which is always the
+            // widest point of a curved layout.
+            halfWidth = p.curveRadius + (lastRow * p.rowSpacing);
+        }
+        else
+        {
+            float rowWidth = (p.seatsPerRow - 1) * p.seatSpacing;
+            float aisleExtra = Mathf.Max(0, p.aisleCount) * p.aisleWidth;
+            halfWidth = (rowWidth / 2f) + aisleExtra;
+        }
+
+        float requiredWidth = (halfWidth * 2f) + p.roomSafetyMargin;
+
+        return new Vector3(requiredWidth, requiredHeight, requiredLength);
     }
 
     /// <summary>Straight rows: seats sit on a flat line, all facing forward (toward the screen).</summary>
@@ -154,21 +210,14 @@ public static class SeatGenerator
 
     private static void CreateSeatObject(Transform parent, SeatData seat, VenueParameters p)
     {
-        GameObject seatObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        seatObj.name = $"Seat_{seat.Id}";
-        seatObj.transform.SetParent(parent, false);
-        seatObj.transform.localPosition = seat.Position + new Vector3(0, 0.4f, 0); // lift so it sits on the floor
-        seatObj.transform.localRotation = seat.Rotation;
-        seatObj.transform.localScale = new Vector3(p.seatWidth, 0.8f, 0.6f);
-
-        var renderer = seatObj.GetComponent<Renderer>();
-        renderer.material.color = ColorForSeatType(seat.Type);
-
-        var controller = seatObj.AddComponent<SeatController>();
-        controller.Seat = seat;
+        // Actual seat geometry/materials live in CinemaSeatBuilder now (backrest,
+        // cushion, armrests, base — see spec section 4) instead of a single cube.
+        // SeatGenerator stays focused on WHERE seats go; CinemaSeatBuilder handles
+        // what they look like.
+        CinemaSeatBuilder.Build(parent, seat, p);
     }
 
-    private static Color ColorForSeatType(SeatType type)
+    internal static Color ColorForSeatType(SeatType type)
     {
         switch (type)
         {

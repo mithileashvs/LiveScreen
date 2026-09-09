@@ -337,6 +337,7 @@ GameObject:
   - component: {fileID: 2090018994}
   - component: {fileID: 2090018997}
   - component: {fileID: 2090018998}
+  - component: {fileID: 2090018999}
   m_Layer: 0
   m_Name: VenueManager
   m_TagString: Untagged
@@ -391,6 +392,16 @@ MonoBehaviour:
     eyeHeightPremium: 1.15
     eyeHeightRecliner: 1
     experienceFieldOfView: 70
+    roomSafetyMargin: 4
+    ceilingHeadroom: 2.4
+    ceilingLightSpacing: 4
+    ceilingLightIntensity: 1
+    ceilingLightColor: {r: 0.82, g: 0.87, b: 1, a: 1}
+    aisleLightSpacing: 2.2
+    aisleLightIntensity: 0.35
+    aisleLightColor: {r: 1, g: 0.82, b: 0.55, a: 1}
+    wallPanelSpacing: 2.5
+    screenGlowIntensity: 0.8
   GeneratedSeats: []
   SelectedSeat:
     Id: 
@@ -440,6 +451,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8297316192b451146a4d1d84f0974052, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FlutterBridge
+--- !u!114 &2090018999
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2090018993}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90b0dfb93472b4a43ace184e396da973, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpatialAudioManager
+  screenAudioClip: {fileID: 0}
+  ambientClip: {fileID: 0}
+  ambientVolume: 0.15
+  playStartupTestSweep: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

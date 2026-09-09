@@ -19,6 +19,14 @@ using UnityEngine;
 /// </summary>
 public static class RoomGenerator
 {
+    /// <summary>
+    /// The wall material's base color, exposed so other systems (currently
+    /// just OrbitCamera's background) can match it exactly rather than
+    /// duplicating the literal — keeps "the exterior looks the same as the
+    /// walls" from silently drifting out of sync if either value changes.
+    /// </summary>
+    public static readonly Color WallColor = new Color(0.11f, 0.10f, 0.13f);
+
     private static Material _floorMaterial;
     private static Material _ceilingMaterial;
     private static Material _wallMaterial;
@@ -166,6 +174,22 @@ public static class RoomGenerator
     }
 
     /// <summary>Small warm floor-level marker lights along a side wall's aisle (spec section 6).</summary>
+    // Real-time Lights are expensive in WebGL (no deferred rendering
+    // available, so every light adds a full extra shading pass on
+    // everything it touches). The original spacing-based counts scaled
+    // linearly with room size with NO upper bound — a large real theatre
+    // (e.g. 20 rows, ~26m long) produced 22 aisle lights + 12 ceiling
+    // lights = 34 simultaneous real-time point lights, on top of ~3000
+    // unbatched seat-part renderers for 500 seats. That combination is
+    // almost certainly what was exhausting the GPU and causing a WebGL
+    // context loss (which Chrome/the OS sometimes recovers from by
+    // reloading the tab) once a real, large admin-configured theatre
+    // loaded instead of a small test one. These caps keep the light count
+    // bounded regardless of how big the configured room is; going wider
+    // just spreads the same fixed number of fixtures further apart.
+    private const int MaxCeilingLightRows = 5;  // x2 columns = 10 lights max
+    private const int MaxAisleLightsPerSide = 6; // x2 sides = 12 lights max
+
     private static void BuildAisleLighting(Transform parent, VenueParameters p, float wallX, string side)
     {
         if (p.aisleLightSpacing <= 0f) return;
@@ -174,12 +198,13 @@ public static class RoomGenerator
         lights.transform.SetParent(parent, false);
 
         float inwardOffset = wallX > 0 ? -0.2f : 0.2f;
-        int count = Mathf.Max(1, Mathf.FloorToInt(p.roomLength / p.aisleLightSpacing));
+        int desiredCount = Mathf.Max(1, Mathf.FloorToInt(p.roomLength / p.aisleLightSpacing));
+        int count = Mathf.Min(desiredCount, MaxAisleLightsPerSide);
+        float effectiveSpacing = p.roomLength / count;
 
         for (int i = 0; i < count; i++)
         {
-            float z = (i + 0.5f) * p.aisleLightSpacing;
-            if (z >= p.roomLength) break;
+            float z = (i + 0.5f) * effectiveSpacing;
 
             Vector3 pos = new Vector3(wallX + inwardOffset, 0.15f, z);
 
@@ -193,7 +218,7 @@ public static class RoomGenerator
             light.type = LightType.Point;
             light.color = p.aisleLightColor;
             light.intensity = p.aisleLightIntensity;
-            light.range = Mathf.Max(2f, p.aisleLightSpacing);
+            light.range = Mathf.Max(2f, effectiveSpacing);
         }
     }
 
@@ -207,14 +232,15 @@ public static class RoomGenerator
 
         float halfWidth = p.roomWidth / 2f;
         float[] columnsX = { -halfWidth * 0.5f, halfWidth * 0.5f };
-        int rowsOfLights = Mathf.Max(1, Mathf.FloorToInt(p.roomLength / p.ceilingLightSpacing));
+        int desiredRows = Mathf.Max(1, Mathf.FloorToInt(p.roomLength / p.ceilingLightSpacing));
+        int rowsOfLights = Mathf.Min(desiredRows, MaxCeilingLightRows);
+        float effectiveSpacing = p.roomLength / rowsOfLights;
         float fixtureY = p.roomHeight - 0.08f; // recessed just below the ceiling slab
 
         int index = 0;
         for (int i = 0; i < rowsOfLights; i++)
         {
-            float z = (i + 0.5f) * p.ceilingLightSpacing;
-            if (z >= p.roomLength) break;
+            float z = (i + 0.5f) * effectiveSpacing;
 
             foreach (float x in columnsX)
             {
@@ -230,7 +256,7 @@ public static class RoomGenerator
                 light.type = LightType.Point;
                 light.color = p.ceilingLightColor;
                 light.intensity = p.ceilingLightIntensity;
-                light.range = p.ceilingLightSpacing * 1.3f;
+                light.range = effectiveSpacing * 1.3f;
 
                 index++;
             }
@@ -272,7 +298,7 @@ public static class RoomGenerator
     private static Material GetWallMaterial()
     {
         if (_wallMaterial != null) return _wallMaterial;
-        _wallMaterial = BuildMaterial(new Color(0.11f, 0.10f, 0.13f), glossiness: 0.12f, metallic: 0f); // acoustic fabric wall
+        _wallMaterial = BuildMaterial(WallColor, glossiness: 0.12f, metallic: 0f); // acoustic fabric wall
         return _wallMaterial;
     }
 

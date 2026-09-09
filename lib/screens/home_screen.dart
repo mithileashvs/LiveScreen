@@ -4,7 +4,10 @@ import '../data/demo_data.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/featured_event_card.dart';
 import '../widgets/venue_card.dart';
+import '../admin/models/theatre_configuration.dart';
+import '../admin/services/theatre_repository.dart';
 import 'event_details_screen.dart';
+import 'theatre_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +18,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategory = 'Movies';
+  late Future<List<TheatreConfiguration>> _theatresFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Published theatres come straight from the same database a Theatre
+    // Admin publishes through — no separate hardcoded user-side list.
+    _theatresFuture = theatreRepository.getPublishedTheatres();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +96,92 @@ class _HomeScreenState extends State<HomeScreen> {
                   CategoryChip(emoji: '🎪', label: 'Events', selected: _selectedCategory == 'Events', onTap: () => setState(() => _selectedCategory = 'Events')),
                 ],
               ),
+            ),
+            const SizedBox(height: 24),
+
+            // Live Theatres — published theatres from the shared database
+            // (Theatre Admin's Preview & Publish). See PART: cross-role
+            // persistence — this is the section that must show a theatre
+            // right after a Theatre Admin publishes it.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Live Theatres', style: AppTextStyles.heading.copyWith(fontSize: 18)),
+            ),
+            const SizedBox(height: 14),
+            FutureBuilder<List<TheatreConfiguration>>(
+              future: _theatresFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('Loading theatres...', style: AppTextStyles.caption),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('Unable to load theatres. Try again.',
+                        style: AppTextStyles.caption),
+                  );
+                }
+                final theatres = snapshot.data ?? [];
+                if (theatres.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('No published theatres yet.', style: AppTextStyles.caption),
+                  );
+                }
+                return SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: theatres.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final theatre = theatres[index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TheatreDetailScreen(theatreId: theatre.id),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 200,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                theatre.basicInfo.name,
+                                style: AppTextStyles.subheading,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                theatre.content?.title.isNotEmpty == true
+                                    ? theatre.content!.title
+                                    : '${theatre.seats.length} seats',
+                                style: AppTextStyles.caption,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 28),
 
