@@ -5,6 +5,7 @@ import '../screens/login_screen.dart';
 import '../../screens/user_dashboard_screen.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../producer/screens/producer_dashboard_screen.dart';
+import '../../platform_admin/screens/platform_admin_dashboard_screen.dart';
 
 /// PART 13: the ONE place that maps a role to its home screen. LoginScreen
 /// and [RoleGate] both call this instead of each hardcoding their own
@@ -26,6 +27,8 @@ class RoleRouter {
         return const AdminDashboardScreen();
       case UserRole.producer:
         return const ProducerDashboardScreen();
+      case UserRole.platformAdmin:
+        return const PlatformAdminDashboardScreen();
     }
   }
 }

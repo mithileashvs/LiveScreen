@@ -20,6 +20,20 @@ abstract class AuthService extends ChangeNotifier {
   /// never leaves [currentSession] partially updated on failure.
   Future<UserSession> login(String userId, String password);
 
+  /// Creates a new Supabase Auth account with the given [role] and signs
+  /// them in — the account-credentials step of registration (task section
+  /// 2A). Does NOT create a [TheatreAdmin]/[TheatreAdminRepository] row;
+  /// the registration screen calls [TheatreAdminRepository.registerAdmin]
+  /// separately right after, once this returns a session for the new
+  /// account to act as. Throws [AuthException] on a taken email, weak
+  /// password, etc. — same never-crashes contract as [login].
+  Future<UserSession> signUp({
+    required String email,
+    required String password,
+    required UserRole role,
+    required String displayName,
+  });
+
   Future<void> logout();
 }
 
@@ -40,6 +54,7 @@ class DemoAuthService extends AuthService {
     _DemoAccount('user_demo', 'User@123', UserRole.user),
     _DemoAccount('theatre_demo', 'Theatre@123', UserRole.theatreAdmin),
     _DemoAccount('producer_demo', 'Producer@123', UserRole.producer),
+    _DemoAccount('platform_admin_demo', 'Platform@123', UserRole.platformAdmin),
   ];
 
   UserSession? _currentSession;
@@ -63,6 +78,18 @@ class DemoAuthService extends AuthService {
     }
 
     throw const AuthException('Incorrect ID or password.');
+  }
+
+  @override
+  Future<UserSession> signUp({
+    required String email,
+    required String password,
+    required UserRole role,
+    required String displayName,
+  }) async {
+    throw const AuthException(
+      'Registration is not available in demo mode — this app is Supabase-backed; see SupabaseAuthService.',
+    );
   }
 
   @override

@@ -34,7 +34,15 @@ class SupabaseTheatreRepository implements TheatreRepository {
     // The row's real id is always authoritative, in case the jsonb snapshot
     // is stale or was ever written before the id was known.
     configJson['id'] = row['id'];
-    return TheatreConfiguration.fromJson(configJson);
+    final config = TheatreConfiguration.fromJson(configJson);
+
+    // verification_status/review_reason/owner_id are Platform-Admin-owned
+    // database columns, never written as part of saveTheatre()'s jsonb
+    // snapshot — always trust the row for these, never the jsonb.
+    config.verificationStatus = row['verification_status'] as String? ?? 'pending';
+    config.reviewReason = row['review_reason'] as String?;
+    config.ownerId = row['owner_id'] as String?;
+    return config;
   }
 
   Map<String, dynamic> _projectionColumns(TheatreConfiguration config) => {
@@ -104,13 +112,54 @@ class SupabaseTheatreRepository implements TheatreRepository {
 
   @override
   Future<List<TheatreConfiguration>> getMyTheatres() async {
-    final ownerId = _requireUserId();
-    final rows = await _client
-        .from('theatres')
-        .select()
-        .eq('owner_id', ownerId)
-        .order('created_at');
-    return rows.map((r) => _fromRow(r as Map<String, dynamic>)).toList();
+    final userId = _requireUserId();
+
+    // Preferred path: every theatre this admin has a VERIFIED relationship
+    // for, via theatre_admin_theatres — the actual source of truth for
+    // "which theatres may I manage" (see
+    // supabase/migrations/0006_theatre_admin_identity.sql). "My Theatres"/
+    // the theatre switcher should only ever offer a theatre the admin can
+    // actually configure, so pending/rejected relationships are excluded
+    // here (TheatreAdminRepository.getMyTheatreRelationships() is the one
+    // that surfaces those, e.g. for a "Pending verification" row).
+    final adminRow = await _client.from('theatre_admins').select('id').eq('profile_id', userId).maybeSingle();
+
+    if (adminRow != null) {
+      final adminId = adminRow['id'] as String;
+
+      // Step 1: resolve ONLY this admin's own verified relationship rows.
+      // `theatre_admin_theatres_select_own` RLS already restricts every
+      // row this query can see to ones whose admin_id belongs to the
+      // caller's own profile_id — the .eq('admin_id', adminId) below is
+      // redundant with that policy, not a substitute for it, and is kept
+      // so this reads correctly even considered on its own.
+      final relationshipRows = await _client
+          .from('theatre_admin_theatres')
+          .select('theatre_id')
+          .eq('admin_id', adminId)
+          .eq('verification_status', 'verified');
+
+      final theatreIds = relationshipRows.map((r) => r['theatre_id'] as String).toSet().toList();
+      if (theatreIds.isEmpty) return const [];
+
+      // Step 2: fetch exactly those theatres, by id — a plain `IN (...)`
+      // filter, not a PostgREST embed. `theatres_select_own`'s
+      // is_authorized_theatre_admin(id) check still independently has to
+      // agree for each row to come back at all, so a row here can never
+      // exceed what step 1 already decided, even if that policy is later
+      // widened for an unrelated reason.
+      final rows = await _client.from('theatres').select().inFilter('id', theatreIds).order('created_at');
+      return rows.map(_fromRow).toList();
+    }
+
+    // Fallback: an account with no theatre_admins row yet (shouldn't
+    // normally happen post-migration, but covers any account the 0006
+    // backfill didn't reach, or a fresh theatre_admin profile that hasn't
+    // gone through registerAdmin() yet) — RLS (is_authorized_theatre_admin)
+    // still allows this via the legacy owner_id branch, so this query
+    // still only returns what this account is actually authorized for.
+    final rows = await _client.from('theatres').select().eq('owner_id', userId).order('created_at');
+    return rows.map(_fromRow).toList();
   }
 
   @override
@@ -120,11 +169,53 @@ class SupabaseTheatreRepository implements TheatreRepository {
         .select()
         .eq('status', TheatreStatus.published.name)
         .order('created_at');
-    return rows.map((r) => _fromRow(r as Map<String, dynamic>)).toList();
+    return rows.map(_fromRow).toList();
+  }
+
+  @override
+  Future<TheatreDependencySummary> getTheatreDependencies(String id) async {
+    try {
+      final showRows = await _client.from('shows').select('id').eq('theatre_id', id);
+      final bookingRows = await _client.from('bookings').select('id').eq('theatre_id', id);
+      return TheatreDependencySummary(
+        showCount: (showRows as List).length,
+        bookingCount: (bookingRows as List).length,
+      );
+    } catch (_) {
+      return const TheatreDependencySummary();
+    }
+  }
+
+  @override
+  Future<void> deactivateTheatre(String id) async {
+    final config = await loadTheatre(id);
+    if (config == null) {
+      throw StateError('Theatre not found: $id');
+    }
+    config.status = TheatreStatus.archived;
+    await saveTheatre(config);
+  }
+
+  @override
+  Future<void> reactivateTheatre(String id) async {
+    final config = await loadTheatre(id);
+    if (config == null) {
+      throw StateError('Theatre not found: $id');
+    }
+    config.status = TheatreStatus.published;
+    await saveTheatre(config);
   }
 
   @override
   Future<void> deleteTheatre(String id) async {
+    final deps = await getTheatreDependencies(id);
+    if (deps.hasDependencies) {
+      throw TheatreHasDependenciesException(
+        theatreId: id,
+        showCount: deps.showCount,
+        bookingCount: deps.bookingCount,
+      );
+    }
     await _client.from('theatres').delete().eq('id', id);
   }
 

@@ -1,17 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../models/movie_content.dart';
 import '../../models/theatre_configuration.dart';
 import '../../services/movie_repository.dart';
 
-/// PART 10 (original) / shared-database task: this tab can now either pick
-/// from a Producer's published movie catalog (via [MovieRepository] — the
-/// same table the Producer dashboard writes to, "do not create separate
-/// disconnected movie data for Producer and Theatre Admin") or still type
-/// one in by hand, same as before. Picking a catalog movie copies its
-/// fields into `config.content` (keeping the theatre's own editable
-/// snapshot, same as previously) and records which producer movie it came
-/// from via `producerId`, so the link stays traceable.
 class MovieTab extends StatefulWidget {
   final TheatreConfiguration config;
   final VoidCallback onChanged;
@@ -44,7 +35,7 @@ class _MovieTabState extends State<MovieTab> {
       status: catalogMovie.status,
     );
     widget.onChanged();
-    setState(() {}); // refresh the manual-entry fields below to match
+    setState(() {});
   }
 
   @override
@@ -53,15 +44,18 @@ class _MovieTabState extends State<MovieTab> {
     final movie = config.content ?? MovieContent(id: '${config.id}_movie');
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       children: [
-        const Text('Movie / Trailer', style: AppTextStyles.subheading),
+        const Text(
+          'Movie / Trailer Assignment',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+        ),
         const SizedBox(height: 4),
         const Text(
-          'Associate a trailer with this theatre for the seat-preview experience.',
-          style: AppTextStyles.caption,
+          'Associate a trailer or teaser with this auditorium for customer 3D seat preview experiences.',
+          style: TextStyle(fontSize: 12.5, color: Color(0xFF9CA3AF)),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         FutureBuilder<List<MovieContent>>(
           future: _catalogFuture,
           builder: (context, snapshot) {
@@ -72,28 +66,40 @@ class _MovieTabState extends State<MovieTab> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF0F0F12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0x55D4AF37)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Pick from Producer Catalog', style: AppTextStyles.subheading),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<MovieContent>(
-                      value: null,
-                      hint: const Text('Choose a published movie', style: AppTextStyles.body),
-                      items: [
-                        for (final m in catalog)
-                          DropdownMenuItem(value: m, child: Text(m.title, style: AppTextStyles.body)),
-                      ],
-                      onChanged: (m) {
-                        if (m != null) _pickFromCatalog(m);
-                      },
-                      decoration:
-                          const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    const Text('Pick from Producer Catalog', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF))),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF14141A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF22222A)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<MovieContent>(
+                          value: null,
+                          hint: const Text('Choose a verified producer title', style: TextStyle(color: Color(0xFF71717A))),
+                          dropdownColor: const Color(0xFF14141A),
+                          style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13),
+                          isExpanded: true,
+                          items: [
+                            for (final m in catalog)
+                              DropdownMenuItem(value: m, child: Text(m.title.isEmpty ? '(Untitled)' : m.title)),
+                          ],
+                          onChanged: (m) {
+                            if (m != null) _pickFromCatalog(m);
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -103,64 +109,90 @@ class _MovieTabState extends State<MovieTab> {
         ),
         if (movie.producerId != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 14),
             child: Text(
-              'Linked to a producer catalog movie. Editing the fields below only '
-              'changes this theatre\'s copy.',
-              style: AppTextStyles.caption.copyWith(color: AppColors.accent),
+              'Linked to Producer Catalog film. Modifications below are local to this theatre.',
+              style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ),
-        TextFormField(
-          key: ValueKey('movie-title-${movie.id}'),
-          initialValue: movie.title,
-          style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            labelText: 'Title',
-            labelStyle: AppTextStyles.caption,
-            border: OutlineInputBorder(),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF1E1E26)),
           ),
-          onChanged: (v) => _update(movie, title: v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _field(
+                key: 'movie-title-${movie.id}',
+                label: 'Movie Title',
+                initialValue: movie.title,
+                onChanged: (v) => _update(movie, title: v),
+              ),
+              const SizedBox(height: 14),
+              _field(
+                key: 'movie-trailer-${movie.id}',
+                label: 'Trailer Video Path / Stream URL',
+                initialValue: movie.trailerPath,
+                helperText: 'Local asset file path or secure HTTPS video stream URL',
+                onChanged: (v) => _update(movie, trailerPath: v),
+              ),
+              const SizedBox(height: 14),
+              _field(
+                key: 'movie-thumbnail-${movie.id}',
+                label: 'Movie Poster / Thumbnail URL',
+                initialValue: movie.thumbnail,
+                onChanged: (v) => _update(movie, thumbnail: v),
+              ),
+              const SizedBox(height: 14),
+              _field(
+                key: 'movie-duration-${movie.id}',
+                label: 'Duration (seconds)',
+                initialValue: movie.durationSeconds.toString(),
+                keyboardType: TextInputType.number,
+                onChanged: (v) {
+                  final parsed = int.tryParse(v);
+                  if (parsed != null) _update(movie, durationSeconds: parsed);
+                },
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Widget _field({
+    required String key,
+    required String label,
+    required String initialValue,
+    required ValueChanged<String> onChanged,
+    String? helperText,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+        const SizedBox(height: 6),
         TextFormField(
-          key: ValueKey('movie-trailer-${movie.id}'),
-          initialValue: movie.trailerPath,
-          style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            labelText: 'Trailer Path / URL',
-            labelStyle: AppTextStyles.caption,
-            helperText: 'Local file path today; a hosted URL once uploads are supported.',
-            border: OutlineInputBorder(),
+          key: ValueKey(key),
+          initialValue: initialValue,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13.5),
+          decoration: InputDecoration(
+            helperText: helperText,
+            helperStyle: const TextStyle(color: Color(0xFF71717A), fontSize: 11),
+            filled: true,
+            fillColor: const Color(0xFF14141A),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
-          onChanged: (v) => _update(movie, trailerPath: v),
-        ),
-        const SizedBox(height: 14),
-        TextFormField(
-          key: ValueKey('movie-thumbnail-${movie.id}'),
-          initialValue: movie.thumbnail,
-          style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            labelText: 'Thumbnail Path / URL',
-            labelStyle: AppTextStyles.caption,
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (v) => _update(movie, thumbnail: v),
-        ),
-        const SizedBox(height: 14),
-        TextFormField(
-          key: ValueKey('movie-duration-${movie.id}'),
-          initialValue: movie.durationSeconds.toString(),
-          keyboardType: TextInputType.number,
-          style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            labelText: 'Duration (seconds)',
-            labelStyle: AppTextStyles.caption,
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (v) {
-            final parsed = int.tryParse(v);
-            if (parsed != null) _update(movie, durationSeconds: parsed);
-          },
+          onChanged: onChanged,
         ),
       ],
     );

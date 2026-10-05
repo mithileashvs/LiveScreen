@@ -27,6 +27,11 @@ public static class RoomGenerator
     /// </summary>
     public static readonly Color WallColor = new Color(0.11f, 0.10f, 0.13f);
 
+    /// <summary>Outcome of the most recent room-vs-seating check. Read by
+    /// FlutterBridge so an undersized real theatre is reported to Flutter
+    /// rather than quietly corrected.</summary>
+    public static RoomFitReport LastFitReport;
+
     private static Material _floorMaterial;
     private static Material _ceilingMaterial;
     private static Material _wallMaterial;
@@ -98,16 +103,67 @@ public static class RoomGenerator
     /// re-syncs its display fields after Generate() so the owner can see if
     /// their entered numbers were too small and got auto-expanded.
     /// </summary>
+    /// <summary>
+    /// Checks the room against the space the seating and screen actually
+    /// need.
+    ///
+    /// This used to unconditionally do `p.roomWidth = Mathf.Max(...)` — it
+    /// silently rewrote the theatre owner's configured dimensions, and
+    /// because VenueParameters is a long-lived object those expansions
+    /// ACCUMULATED across regenerations, so a room could drift further from
+    /// its saved size every time the venue was rebuilt.
+    ///
+    /// Now: when the dimensions came from an owner's saved configuration
+    /// (<see cref="VenueParameters.ownerConfiguredRoom"/>) they are
+    /// authoritative and left exactly as saved, and the mismatch is recorded
+    /// in <see cref="LastFitReport"/> so FlutterBridge can report it as a
+    /// configuration problem. Auto-expansion is kept only for the in-editor
+    /// generator panel and the demo flow, where nobody's saved configuration
+    /// is at stake.
+    ///
+    /// The room stays a fully closed box either way — walls, floor and
+    /// ceiling are still built at whatever dimensions are in effect — so an
+    /// undersized room shows seats intersecting the shell, not open skybox.
+    /// </summary>
     private static void EnsureRoomFitsSeating(VenueParameters p)
     {
         Vector3 required = SeatGenerator.EstimateRequiredRoomBounds(p);
 
-        if (p.roomWidth < required.x || p.roomLength < required.z || p.roomHeight < required.y)
+        bool fits = p.roomWidth >= required.x
+                 && p.roomLength >= required.z
+                 && p.roomHeight >= required.y;
+
+        LastFitReport = new RoomFitReport
         {
-            Debug.Log($"Room auto-expanded to fully enclose the seating layout: " +
-                      $"{p.roomWidth:F1}x{p.roomHeight:F1}x{p.roomLength:F1} -> " +
-                      $"{Mathf.Max(p.roomWidth, required.x):F1}x{Mathf.Max(p.roomHeight, required.y):F1}x{Mathf.Max(p.roomLength, required.z):F1} (W x H x L).");
+            Fits = fits,
+            OwnerConfigured = p.ownerConfiguredRoom,
+            ConfiguredWidth = p.roomWidth,
+            ConfiguredHeight = p.roomHeight,
+            ConfiguredLength = p.roomLength,
+            RequiredWidth = required.x,
+            RequiredHeight = required.y,
+            RequiredLength = required.z,
+        };
+
+        if (fits) return;
+
+        if (p.ownerConfiguredRoom)
+        {
+            Debug.LogError(
+                "[RoomGenerator] This theatre's saved room is too small for its saved " +
+                $"seating/screen. Configured {p.roomWidth:F1}x{p.roomHeight:F1}x{p.roomLength:F1} " +
+                $"(W x H x L), needs at least {required.x:F1}x{required.y:F1}x{required.z:F1}. " +
+                "The saved dimensions are being honoured as-is - fix the theatre's Room or " +
+                "Seating configuration rather than expecting Unity to enlarge it silently.");
+            return;
         }
+
+        Debug.Log(
+            "[RoomGenerator] Room auto-expanded to enclose the seating layout " +
+            $"({p.roomWidth:F1}x{p.roomHeight:F1}x{p.roomLength:F1} -> " +
+            $"{Mathf.Max(p.roomWidth, required.x):F1}x{Mathf.Max(p.roomHeight, required.y):F1}x" +
+            $"{Mathf.Max(p.roomLength, required.z):F1}). Only taken when these are NOT an " +
+            "owner's saved dimensions.");
 
         p.roomWidth = Mathf.Max(p.roomWidth, required.x);
         p.roomHeight = Mathf.Max(p.roomHeight, required.y);
@@ -120,6 +176,15 @@ public static class RoomGenerator
     {
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.045f, 0.045f, 0.06f);
+
+        // Cinema auditorium is an enclosed indoor venue — ensure outdoor sunlight is off
+        foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (l.type == LightType.Directional)
+            {
+                l.enabled = false;
+            }
+        }
     }
 
     /// <summary>
@@ -328,4 +393,24 @@ public static class RoomGenerator
         if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
         return mat;
     }
+}
+
+/// <summary>Result of checking a room against the space its seating and
+/// screen need. Purely descriptive - it changes nothing on its own.</summary>
+public struct RoomFitReport
+{
+    public bool Fits;
+    public bool OwnerConfigured;
+    public float ConfiguredWidth;
+    public float ConfiguredHeight;
+    public float ConfiguredLength;
+    public float RequiredWidth;
+    public float RequiredHeight;
+    public float RequiredLength;
+
+    /// <summary>A short, colon-free summary safe to embed in the
+    /// colon-delimited messages sent to Flutter.</summary>
+    public string Summary =>
+        $"configured {ConfiguredWidth:F1}x{ConfiguredHeight:F1}x{ConfiguredLength:F1}" +
+        $" needs {RequiredWidth:F1}x{RequiredHeight:F1}x{RequiredLength:F1}";
 }

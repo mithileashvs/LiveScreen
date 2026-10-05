@@ -35,3 +35,4 @@ flutter:
   # The real .env is gitignored — only .env.example is committed.
   assets:
     - .env
+    - assets/images/

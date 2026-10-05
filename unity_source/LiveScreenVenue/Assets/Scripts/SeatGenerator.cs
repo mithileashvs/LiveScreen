@@ -10,6 +10,54 @@ using UnityEngine;
 /// </summary>
 public static class SeatGenerator
 {
+    /// <summary>
+    /// Places the theatre's ACTUAL saved seats, exactly as the Theatre
+    /// Owner configured them — same stable IDs (A1..A12, B1..B12, ...) the
+    /// web seat map and the booking system already use, same coordinates,
+    /// same per-seat category. Nothing is re-derived here, so a category an
+    /// owner overrode on one individual seat survives into Unity instead of
+    /// being overwritten by the row-based heuristic in
+    /// <see cref="DetermineSeatType"/>.
+    ///
+    /// This overload is the one used whenever Flutter sent a configuration.
+    /// The parameter-only overload below remains for the case where no
+    /// theatre configuration exists at all (a brand-new theatre, or the
+    /// in-editor generator panel).
+    /// </summary>
+    public static List<SeatData> Generate(Transform parent, VenueParameters p, SeatPlacement[] savedSeats)
+    {
+        if (savedSeats == null || savedSeats.Length == 0)
+        {
+            return Generate(parent, p);
+        }
+
+        GameObject seatingRoot = new GameObject("Seating");
+        seatingRoot.transform.SetParent(parent, false);
+
+        List<SeatData> placed = new List<SeatData>(savedSeats.Length);
+
+        foreach (SeatPlacement saved in savedSeats)
+        {
+            if (saved == null || string.IsNullOrEmpty(saved.id)) continue;
+
+            SeatData seat = new SeatData
+            {
+                Id = saved.id,
+                Row = saved.row,
+                Number = saved.number,
+                Type = saved.ToSeatType(),
+                Position = saved.Position,
+                Rotation = saved.Rotation
+            };
+
+            placed.Add(seat);
+            CreateSeatObject(seatingRoot.transform, seat, p);
+        }
+
+        Debug.Log($"[SeatGenerator] Placed {placed.Count} seats from the theatre's saved configuration.");
+        return placed;
+    }
+
     public static List<SeatData> Generate(Transform parent, VenueParameters p)
     {
         GameObject seatingRoot = new GameObject("Seating");
@@ -128,7 +176,7 @@ public static class SeatGenerator
         // ScreenGenerator's bezel is drawn 0.5m taller/wider than the screen
         // itself (see ScreenGenerator.BuildBezel) — matched here so the
         // bezel can't poke through either, not just the screen panel.
-        float screenTopEdge = p.screenHeightFromFloor + p.screenHeight + 0.5f;
+        float screenTopEdge = p.ResolvedScreenCenterY + (p.screenHeight / 2f) + 0.5f;
         float requiredHeight = Mathf.Max(seatingRequiredHeight, screenTopEdge + p.ceilingHeadroom);
 
         float halfWidth;

@@ -57,6 +57,8 @@
     <Compile Include="Assets\Scripts\ExperienceController.cs" />
     <Compile Include="Assets\Scripts\ScreenGenerator.cs" />
     <Compile Include="Assets\Scripts\ExperienceSession.cs" />
+    <Compile Include="Assets\Scripts\TrailerScreenPlayer.cs" />
+    <Compile Include="Assets\Scripts\SpeakerGenerator.cs" />
     <Compile Include="Assets\Scripts\VenueGeneratorUI.cs" />
     <Compile Include="Assets\Scripts\CinemaSeatBuilder.cs" />
     <Compile Include="Assets\Scripts\SpatialAudioManager.cs" />
@@ -64,11 +66,16 @@
     <Compile Include="Assets\Scripts\SeatGenerator.cs" />
     <Compile Include="Assets\Scripts\ProceduralTone.cs" />
     <Compile Include="Assets\Scripts\VenueParameters.cs" />
+    <Compile Include="Assets\Scripts\TheatreConfigPayload.cs" />
+    <Compile Include="Assets\Scripts\SpeakerVisual.cs" />
     <Compile Include="Assets\Scripts\FlutterBridge.cs" />
     <Compile Include="Assets\Scripts\SeatData.cs" />
     <Compile Include="Assets\Scripts\RoomGenerator.cs" />
     <Compile Include="Assets\Scripts\VenueDataExporter.cs" />
     <Compile Include="Assets\Scripts\OrbitCamera.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\Shaders\CinemaScreenShader.shader" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

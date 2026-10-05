@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../models/seat_config.dart';
 import '../../models/theatre_configuration.dart';
 import '../../services/seat_layout_generator.dart';
@@ -42,20 +41,51 @@ class _SeatingTabState extends State<SeatingTab> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+          color: const Color(0xFF0F0F12),
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  '${config.seats.length} seats configured',
-                  style: AppTextStyles.subheading,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Auditorium Seating Grid',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFFFFFF),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${config.seats.length} seats configured · Tap a seat to inspect or customize',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                    ),
+                  ],
                 ),
               ),
-              TextButton.icon(
+              OutlinedButton.icon(
                 onPressed: () => setState(() => _showLayoutForm = !_showLayoutForm),
-                icon: Icon(_showLayoutForm ? Icons.expand_less : Icons.tune),
-                label: Text(_showLayoutForm ? 'Hide layout settings' : 'Layout settings'),
+                icon: Icon(
+                  _showLayoutForm ? Icons.expand_less : Icons.tune,
+                  size: 16,
+                  color: const Color(0xFFD4AF37),
+                ),
+                label: Text(
+                  _showLayoutForm ? 'Hide Settings' : 'Layout Settings',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0x66D4AF37)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ],
           ),
@@ -67,8 +97,8 @@ class _SeatingTabState extends State<SeatingTab> {
             child: config.seats.isEmpty
                 ? const Center(
                     child: Text(
-                      'No seats yet. Open Layout settings and tap Generate Seats.',
-                      style: AppTextStyles.body,
+                      'No seats yet. Open Layout Settings above and tap Generate Seats.',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   )
@@ -97,8 +127,9 @@ class _SeatingTabState extends State<SeatingTab> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF0F0F12),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E26)),
       ),
       child: Column(
         children: [
@@ -186,21 +217,29 @@ class _SeatingTabState extends State<SeatingTab> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _generate,
-              child: Text(widget.config.seats.isEmpty ? 'Generate Seats' : 'Regenerate Seats'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                widget.config.seats.isEmpty ? 'Generate Seats' : 'Regenerate Seats',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              ),
             ),
           ),
           if (widget.config.seats.isNotEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                'Regenerating replaces the current seat grid with a fresh one '
-                'using these settings.',
-                style: AppTextStyles.caption,
+                'Regenerating replaces the current seat grid with a fresh one using these settings.',
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
                 textAlign: TextAlign.center,
               ),
             ),

@@ -71,7 +71,7 @@ class SupabaseBookingRepository implements BookingRepository {
         .select()
         .eq('user_id', userId)
         .order('created_at');
-    return rows.map((r) => BookingModel.fromRow(r as Map<String, dynamic>)).toList();
+    return rows.map((r) => BookingModel.fromRow(r)).toList();
   }
 }
 

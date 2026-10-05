@@ -41,6 +41,28 @@ public class VenueParameters
     public float screenDistanceFromFrontWall = 1f;
     public float screenHeightFromFloor = 2f;
 
+    [Tooltip("Lateral offset of the screen's centre from the room's centre " +
+             "line, in metres. Comes from the theatre's saved ScreenConfig " +
+             "position.x — a screen an owner deliberately moved off-centre " +
+             "used to be silently re-centred here.")]
+    public float screenOffsetX = 0f;
+
+    [Tooltip("Height of the screen's CENTRE above the floor, in metres. " +
+             "Negative means 'not specified' — fall back to deriving it " +
+             "from screenHeightFromFloor + screenHeight/2, which is what " +
+             "this scene did before a theatre's own screen position was " +
+             "ever sent. Comes from ScreenConfig position.y.")]
+    public float screenCenterY = -1f;
+
+    [Tooltip("Screen rotation around the vertical axis, in degrees. 0 faces " +
+             "straight down +Z into the auditorium. From ScreenConfig.rotationY.")]
+    public float screenRotationY = 0f;
+
+    /// <summary>The screen centre height actually used, honouring
+    /// <see cref="screenCenterY"/> when the theatre specified one.</summary>
+    public float ResolvedScreenCenterY =>
+        screenCenterY >= 0f ? screenCenterY : screenHeightFromFloor + (screenHeight / 2f);
+
     [Header("Seating Layout")]
     public int rows = 15;
     public int seatsPerRow = 20;
@@ -68,6 +90,16 @@ public class VenueParameters
     public float eyeHeightRecliner = 1.0f;
     [Tooltip("Camera field of view during the seat experience, in degrees")]
     public float experienceFieldOfView = 70f;
+
+    [Header("Ownership of Room Dimensions")]
+    [Tooltip("True when roomWidth/roomLength/roomHeight came from a theatre " +
+             "owner's saved configuration. When true those dimensions are " +
+             "AUTHORITATIVE: RoomGenerator must not quietly enlarge them to " +
+             "fit the seating, and reports a validation problem instead. " +
+             "False for the in-editor generator panel and the demo flow, " +
+             "where auto-expansion is a convenience rather than a silent " +
+             "rewrite of somebody's configuration.")]
+    public bool ownerConfiguredRoom = false;
 
     [Header("Enclosure Safety (Phase 4 - Immersive Theatre)")]
     [Tooltip("Extra space (metres) always left behind the back row and above " +

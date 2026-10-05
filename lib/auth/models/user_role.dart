@@ -1,7 +1,7 @@
 /// The three roles LiveScreen currently supports (PART 11). Kept as a
 /// plain enum — adding a real backend later only means swapping what
 /// produces a [UserRole], never how the rest of the app consumes one.
-enum UserRole { user, theatreAdmin, producer }
+enum UserRole { user, theatreAdmin, producer, platformAdmin }
 
 extension UserRoleLabel on UserRole {
   String get label {
@@ -12,6 +12,8 @@ extension UserRoleLabel on UserRole {
         return 'Theatre Admin';
       case UserRole.producer:
         return 'Producer';
+      case UserRole.platformAdmin:
+        return 'Platform Admin';
     }
   }
 }

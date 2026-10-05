@@ -7,9 +7,7 @@ import 'digital_ticket_screen.dart';
 
 enum PaymentMethod { upi, card, netBanking }
 
-/// A realistic-looking but fully mock checkout screen.
-/// No real payment gateway is integrated in Phase 1 —
-/// pressing "Pay" simply simulates a successful payment.
+/// Checkout payment screen matching the LiveScreen visual system.
 class MockPaymentScreen extends StatefulWidget {
   final EventModel event;
   final VenueModel venue;
@@ -41,8 +39,7 @@ class _MockPaymentScreenState extends State<MockPaymentScreen> {
   void _payNow() async {
     setState(() => _isProcessing = true);
 
-    // Simulate a short "processing" delay, like a real payment gateway would have.
-    await Future.delayed(const Duration(milliseconds: 1400));
+    await Future.delayed(const Duration(milliseconds: 1200));
 
     if (!mounted) return;
 
@@ -64,76 +61,110 @@ class _MockPaymentScreenState extends State<MockPaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Payment')),
+      appBar: AppBar(
+        title: const Text('Payment', style: AppTextStyles.heading),
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: AppColors.border, height: 1),
+        ),
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Expanded(
               child: ListView(
                 children: [
-                  // Amount due
+                  // Amount due card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.surfaceElevated, AppColors.surface],
-                      ),
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Amount to pay', style: AppTextStyles.body),
+                        const Text('Amount to Pay', style: AppTextStyles.body),
                         const SizedBox(height: 6),
                         Text(
                           '₹${widget.total.toInt()}',
-                          style: AppTextStyles.displayLarge.copyWith(color: AppColors.accent),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.navy,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 28),
 
-                  Text('Choose Payment Method', style: AppTextStyles.subheading),
+                  const Text('Payment Method', style: AppTextStyles.subheading),
                   const SizedBox(height: 14),
 
                   _paymentOption(
                     method: PaymentMethod.upi,
                     icon: Icons.qr_code_rounded,
                     title: 'UPI',
-                    subtitle: 'Pay using any UPI app (mock)',
+                    subtitle: 'Google Pay, PhonePe, Paytm, BHIM',
                   ),
                   const SizedBox(height: 12),
                   _paymentOption(
                     method: PaymentMethod.card,
                     icon: Icons.credit_card_rounded,
                     title: 'Credit / Debit Card',
-                    subtitle: 'Visa, Mastercard, Rupay (mock)',
+                    subtitle: 'Visa, Mastercard, RuPay',
                   ),
                   const SizedBox(height: 12),
                   _paymentOption(
                     method: PaymentMethod.netBanking,
                     icon: Icons.account_balance_rounded,
                     title: 'Net Banking',
-                    subtitle: 'All major banks supported (mock)',
+                    subtitle: 'All major Indian banks supported',
                   ),
                 ],
               ),
             ),
-            ElevatedButton(
-              onPressed: _isProcessing ? null : _payNow,
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 54)),
-              child: _isProcessing
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black),
-                    )
-                  : Text('Pay ₹${widget.total.toInt()}'),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isProcessing ? null : _payNow,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.navy,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                child: _isProcessing
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: AppColors.navy,
+                        ),
+                      )
+                    : Text('Pay ₹${widget.total.toInt()} →'),
+              ),
             ),
           ],
         ),
@@ -148,27 +179,53 @@ class _MockPaymentScreenState extends State<MockPaymentScreen> {
     required String subtitle,
   }) {
     final bool selected = _selectedMethod == method;
-    return GestureDetector(
+    return InkWell(
       onTap: () => setState(() => _selectedMethod = method),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? AppColors.accent : Colors.white.withValues(alpha: 0.08),
-            width: selected ? 1.6 : 1,
+            color: selected ? AppColors.accent : AppColors.border,
+            width: selected ? 1.5 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: selected ? 0.03 : 0.01),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: selected ? AppColors.accent : AppColors.textSecondary),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.navy.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: selected ? AppColors.navy : AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.subheading.copyWith(fontSize: 15)),
+                  Text(
+                    title,
+                    style: AppTextStyles.subheading.copyWith(
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
                   Text(subtitle, style: AppTextStyles.caption),
                 ],
               ),
@@ -183,3 +240,4 @@ class _MockPaymentScreenState extends State<MockPaymentScreen> {
     );
   }
 }
+
