@@ -8,11 +8,58 @@ import 'supabase_theatre_repository.dart';
 /// made swapping the in-memory mock for a real Supabase-backed
 /// implementation a one-file change (see [SupabaseTheatreRepository]) with
 /// zero changes to any screen.
+/// Summary of relational records associated with a theatre.
+class TheatreDependencySummary {
+  final int showCount;
+  final int bookingCount;
+
+  const TheatreDependencySummary({
+    this.showCount = 0,
+    this.bookingCount = 0,
+  });
+
+  bool get hasDependencies => showCount > 0 || bookingCount > 0;
+}
+
+/// Thrown when an attempt to permanently delete a theatre is blocked
+/// due to existing shows or bookings.
+class TheatreHasDependenciesException implements Exception {
+  final String theatreId;
+  final int showCount;
+  final int bookingCount;
+
+  const TheatreHasDependenciesException({
+    required this.theatreId,
+    required this.showCount,
+    required this.bookingCount,
+  });
+
+  String get message =>
+      'Cannot delete theatre because it has associated records ($showCount show(s), $bookingCount booking(s)). '
+      'Deactivate the theatre instead to preserve historical show and booking data.';
+
+  @override
+  String toString() => message;
+}
+
 abstract class TheatreRepository {
   Future<TheatreConfiguration> createTheatre(TheatreBasicInfo basicInfo);
   Future<void> saveTheatre(TheatreConfiguration config);
   Future<TheatreConfiguration?> loadTheatre(String id);
+
+  /// Checks dependencies before deleting. If associated shows or bookings
+  /// exist, throws [TheatreHasDependenciesException].
   Future<void> deleteTheatre(String id);
+
+  /// Queries the count of shows and bookings linked to [id].
+  Future<TheatreDependencySummary> getTheatreDependencies(String id);
+
+  /// Safely archives a theatre, setting status to [TheatreStatus.archived]
+  /// and stopping public discovery and new bookings while preserving data.
+  Future<void> deactivateTheatre(String id);
+
+  /// Restores an archived theatre to [TheatreStatus.published].
+  Future<void> reactivateTheatre(String id);
 
   /// Theatre Admin's own theatres (draft, published, or archived) —
   /// filtered server-side by ownership, not fetched-then-filtered client-side.
@@ -34,7 +81,14 @@ abstract class TheatreRepository {
 /// Supabase project configured.
 class InMemoryTheatreRepository implements TheatreRepository {
   final Map<String, TheatreConfiguration> _theatres = {};
+  final Map<String, int> _mockShowCounts = {};
+  final Map<String, int> _mockBookingCounts = {};
   int _nextId = 1;
+
+  void setMockDependencies(String id, {int showCount = 0, int bookingCount = 0}) {
+    _mockShowCounts[id] = showCount;
+    _mockBookingCounts[id] = bookingCount;
+  }
 
   @override
   Future<TheatreConfiguration> createTheatre(TheatreBasicInfo basicInfo) async {
@@ -65,7 +119,41 @@ class InMemoryTheatreRepository implements TheatreRepository {
   }
 
   @override
+  Future<TheatreDependencySummary> getTheatreDependencies(String id) async {
+    return TheatreDependencySummary(
+      showCount: _mockShowCounts[id] ?? 0,
+      bookingCount: _mockBookingCounts[id] ?? 0,
+    );
+  }
+
+  @override
+  Future<void> deactivateTheatre(String id) async {
+    final config = _theatres[id];
+    if (config != null) {
+      config.status = TheatreStatus.archived;
+      _theatres[id] = config;
+    }
+  }
+
+  @override
+  Future<void> reactivateTheatre(String id) async {
+    final config = _theatres[id];
+    if (config != null) {
+      config.status = TheatreStatus.published;
+      _theatres[id] = config;
+    }
+  }
+
+  @override
   Future<void> deleteTheatre(String id) async {
+    final deps = await getTheatreDependencies(id);
+    if (deps.hasDependencies) {
+      throw TheatreHasDependenciesException(
+        theatreId: id,
+        showCount: deps.showCount,
+        bookingCount: deps.bookingCount,
+      );
+    }
     _theatres.remove(id);
   }
 

@@ -1,34 +1,48 @@
 import 'package:flutter/material.dart';
 
 /// LiveScreen's central theme file.
-/// Every color, font, and spacing value used across the app
-/// should come from here, so the whole app stays visually consistent.
+/// Defines the brand visual system: Deep Navy (#0B1F3A), Gold (#D4AF37),
+/// Light Background (#F7F8FA), White (#FFFFFF), and Clean Typography.
 class AppColors {
-  // Core cinematic dark palette
-  static const Color background = Color(0xFF0A0A0F);
-  static const Color surface = Color(0xFF16161D);
-  static const Color surfaceElevated = Color(0xFF1E1E28);
+  // Brand primary & navigation
+  static const Color navy = Color(0xFF0B1F3A);
+  static const Color navySurface = Color(0xFF152A4A);
+  static const Color navyLight = Color(0xFF1E3A5F);
+  static const Color navyDark = Color(0xFF071426);
 
-  // Brand accent — a warm cinematic gold, used sparingly for emphasis
-  static const Color accent = Color(0xFFE8B94A);
-  static const Color accentSoft = Color(0xFF8C6D2F);
+  // Brand accent - used sparingly for CTAs, active indicators, ratings, highlights
+  static const Color accent = Color(0xFFD4AF37);
+  static const Color gold = Color(0xFFD4AF37);
+  static const Color accentSoft = Color(0xFFB89628);
 
-  // A cool secondary accent, used for "live/energy" highlights
-  static const Color electricBlue = Color(0xFF4AC8E8);
+  // Main content & surfaces
+  static const Color background = Color(0xFFF7F8FA);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceSubtle = Color(0xFFF1F3F6);
+  static const Color surfaceElevated = Color(0xFFFFFFFF);
 
-  static const Color textPrimary = Color(0xFFF5F5F7);
-  static const Color textSecondary = Color(0xFFA0A0AC);
-  static const Color textMuted = Color(0xFF6B6B76);
+  // Borders & Dividers
+  static const Color border = Color(0xFFE5E7EB);
+  static const Color borderLight = Color(0xFFF3F4F6);
 
-  static const Color success = Color(0xFF4ADE80);
+  // Typography
+  static const Color textPrimary = Color(0xFF111827);
+  static const Color textSecondary = Color(0xFF667085);
+  static const Color textMuted = Color(0xFF9CA3AF);
+  static const Color textLight = Color(0xFFFFFFFF);
+  static const Color textLightMuted = Color(0xFFCBD5E1);
+
+  // Utility
+  static const Color success = Color(0xFF10B981);
   static const Color error = Color(0xFFEF4444);
+  static const Color electricBlue = Color(0xFF0B1F3A);
 
-  // Seat map states
-  static const Color seatAvailable = Color(0xFF2A2A35);
-  static const Color seatSelected = Color(0xFFE8B94A);
-  static const Color seatBooked = Color(0xFF3A3A44);
-  static const Color seatPremium = Color(0xFFB388FF);
-  static const Color seatRecliner = Color(0xFF4AC8E8);
+  // Seat map states - pure cinema palette, strictly no purple
+  static const Color seatAvailable = Color(0xFFFFFFFF);
+  static const Color seatSelected = Color(0xFFD4AF37);
+  static const Color seatBooked = Color(0xFF9CA3AF);
+  static const Color seatPremium = Color(0xFF0B1F3A); // Deep navy, not purple
+  static const Color seatRecliner = Color(0xFF1E3A5F);
 }
 
 class AppTextStyles {
@@ -38,13 +52,14 @@ class AppTextStyles {
     fontSize: 34,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   );
 
   static const TextStyle heading = TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
+    letterSpacing: -0.3,
   );
 
   static const TextStyle subheading = TextStyle(
@@ -57,6 +72,7 @@ class AppTextStyles {
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
+    height: 1.4,
   );
 
   static const TextStyle caption = TextStyle(
@@ -66,30 +82,44 @@ class AppTextStyles {
   );
 
   static const TextStyle button = TextStyle(
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: FontWeight.w600,
-    color: Colors.black,
+    color: AppColors.navy,
   );
 }
 
 class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.background,
-      primaryColor: AppColors.accent,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.accent,
-        secondary: AppColors.electricBlue,
+      primaryColor: AppColors.navy,
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.navy,
+        secondary: AppColors.accent,
         surface: AppColors.surface,
         error: AppColors.error,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: AppTextStyles.heading,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.border,
+        thickness: 1,
+        space: 1,
       ),
       textTheme: const TextTheme(
         displayLarge: AppTextStyles.displayLarge,
@@ -101,12 +131,24 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          foregroundColor: AppColors.navy,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 22),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: AppTextStyles.button,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.navy,
+          side: const BorderSide(color: AppColors.border),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 22),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: AppTextStyles.button.copyWith(color: AppColors.navy),
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -120,3 +162,4 @@ class AppTheme {
     );
   }
 }
+

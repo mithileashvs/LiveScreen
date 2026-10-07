@@ -13,6 +13,16 @@ class TheatreValidation {
       errors.add('Theatre name is required.');
     }
 
+    // Mirrors the database trigger in 0002_platform_admin_verification.sql
+    // (enforce_theatre_transition) — surfaced here too so the checklist
+    // explains *why* Publish will fail, instead of only failing at save time.
+    if (config.verificationStatus != 'verified') {
+      errors.add(
+        'This theatre must be verified by Platform Admin before it can be published '
+        '(current status: ${config.verificationStatus}).',
+      );
+    }
+
     errors.addAll(config.room.validate());
     errors.addAll(config.screen.validate());
 

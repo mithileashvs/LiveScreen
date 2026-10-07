@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../../screens/unity_experience_screen.dart';
 import '../../models/seat_config.dart';
 import '../../models/theatre_configuration.dart';
 import '../../services/theatre_repository.dart';
 import '../../services/theatre_unity_bridge.dart';
 import '../../services/theatre_validation.dart';
-import '../../../shared/models/show_model.dart';
-import '../../../shared/services/show_repository.dart';
 
-/// PART 11/12: seat preview reuses the existing user-facing
-/// [UnityExperienceScreen] unchanged — this is the actual integration
-/// point the spec asks for, not a new preview system. Publishing runs the
-/// same validation a real backend would eventually enforce.
+/// Preview & Publish Tab for Theatre Studio.
+/// Visual seat preview in Unity, publish validation checklist, and live publishing.
 class PreviewPublishTab extends StatefulWidget {
   final TheatreConfiguration config;
   final VoidCallback onChanged;
@@ -26,45 +21,11 @@ class PreviewPublishTab extends StatefulWidget {
 class _PreviewPublishTabState extends State<PreviewPublishTab> {
   SeatConfig? _selectedSeat;
   bool _publishing = false;
-  late Future<List<ShowModel>> _showsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _showsFuture = showRepository.getShowsForTheatre(widget.config.id);
-  }
-
-  Future<void> _addShow() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (time == null || !mounted) return;
-
-    final startTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-
-    try {
-      await showRepository.createShow(
-        theatreId: widget.config.id,
-        movieId: null, // this theatre's single configured movie is used directly at booking time
-        startTime: startTime,
-      );
-      if (!mounted) return;
-      setState(() => _showsFuture = showRepository.getShowsForTheatre(widget.config.id));
-      _showMessage('Show added.');
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage('Could not add show: $e');
-    }
-  }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: const Color(0xFF16161D)),
+    );
   }
 
   Future<void> _saveDraft() async {
@@ -77,26 +38,49 @@ class _PreviewPublishTabState extends State<PreviewPublishTab> {
   Future<void> _publish() async {
     setState(() => _publishing = true);
     final errors = await theatreRepository.publishTheatre(widget.config.id);
+
+    if (errors.isEmpty) {
+      final fresh = await theatreRepository.loadTheatre(widget.config.id);
+      if (fresh != null) {
+        widget.config.status = fresh.status;
+        widget.config.verificationStatus = fresh.verificationStatus;
+        widget.config.reviewReason = fresh.reviewReason;
+      }
+    }
+
     setState(() => _publishing = false);
     widget.onChanged();
 
     if (!mounted) return;
 
     if (errors.isEmpty) {
-      _showMessage('Theatre published.');
+      _showMessage('Theatre published successfully!');
     } else {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: const Text('Cannot publish yet', style: AppTextStyles.subheading),
+          backgroundColor: const Color(0xFF111116),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFEF4444)),
+          ),
+          title: const Text('Cannot Publish Yet', style: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w700)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [for (final e in errors) Text('• $e', style: AppTextStyles.body)],
+            children: [
+              for (final e in errors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $e', style: const TextStyle(color: Color(0xFFF87171), fontSize: 13)),
+                ),
+            ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK', style: TextStyle(color: Color(0xFFD4AF37))),
+            ),
           ],
         ),
       );
@@ -111,6 +95,7 @@ class _PreviewPublishTabState extends State<PreviewPublishTab> {
         builder: (_) => UnityExperienceScreen(
           seatLabel: TheatreUnityBridge.seatIdForPreview(seat.id),
           theatre: widget.config,
+          movie: null,
         ),
       ),
     );
@@ -122,87 +107,78 @@ class _PreviewPublishTabState extends State<PreviewPublishTab> {
     final validationErrors = TheatreValidation.validateForPublish(config);
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       children: [
-        const Text('Preview a Seat', style: AppTextStyles.subheading),
+        const Text(
+          'Preview a Seat in 3D Venue',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+        ),
         const SizedBox(height: 10),
         if (config.seats.isEmpty)
           const Text(
             'Configure seating first — there are no seats to preview yet.',
-            style: AppTextStyles.caption,
+            style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
           )
         else ...[
-          DropdownButtonFormField<SeatConfig>(
-            value: _selectedSeat,
-            hint: const Text('Choose a seat', style: AppTextStyles.body),
-            items: [
-              for (final seat in config.seats)
-                DropdownMenuItem(value: seat, child: Text(seat.id, style: AppTextStyles.body)),
-            ],
-            onChanged: (seat) => setState(() => _selectedSeat = seat),
-            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14141A),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF22222A)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<SeatConfig>(
+                value: _selectedSeat,
+                hint: const Text('Choose a seat to test point-of-view', style: TextStyle(color: Color(0xFF71717A))),
+                dropdownColor: const Color(0xFF14141A),
+                style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13.5),
+                isExpanded: true,
+                items: [
+                  for (final seat in config.seats)
+                    DropdownMenuItem(value: seat, child: Text('Seat ${seat.id} (${seat.category.name.toUpperCase()})')),
+                ],
+                onChanged: (seat) => setState(() => _selectedSeat = seat),
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ElevatedButton.icon(
             onPressed: _selectedSeat == null ? null : _preview,
-            icon: const Icon(Icons.visibility),
-            label: const Text('Preview This Seat'),
+            icon: const Icon(Icons.visibility_outlined, size: 18),
+            label: const Text('Preview This Seat in 3D Venue', style: TextStyle(fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
         ],
         const SizedBox(height: 28),
-        Row(
-          children: [
-            const Expanded(child: Text('Showtimes', style: AppTextStyles.subheading)),
-            TextButton.icon(
-              onPressed: _addShow,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Show'),
-            ),
-          ],
+
+        const Text(
+          'Publish Checklist',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
         ),
-        const SizedBox(height: 6),
-        FutureBuilder<List<ShowModel>>(
-          future: _showsFuture,
-          builder: (context, snapshot) {
-            final shows = snapshot.data ?? [];
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const SizedBox.shrink();
-            }
-            if (shows.isEmpty) {
-              return const Text(
-                'No showtimes yet. Users can still book seats directly against '
-                'this theatre once published.',
-                style: AppTextStyles.caption,
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final show in shows)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text('• ${show.startTime.toLocal()}', style: AppTextStyles.body),
-                  ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 28),
-        const Text('Publish Checklist', style: AppTextStyles.subheading),
         const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: const Color(0xFF0F0F12),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF1E1E26)),
           ),
           child: validationErrors.isEmpty
-              ? const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: AppColors.success, size: 20),
-                    SizedBox(width: 8),
+              ? Row(
+                  children: const [
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+                    SizedBox(width: 10),
                     Expanded(
-                      child: Text('This theatre is ready to publish.', style: AppTextStyles.body),
+                      child: Text(
+                        'This auditorium configuration is complete and ready to publish.',
+                        style: TextStyle(color: Color(0xFFF7F5F0), fontSize: 13.5, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 )
@@ -211,39 +187,52 @@ class _PreviewPublishTabState extends State<PreviewPublishTab> {
                   children: [
                     for (final error in validationErrors)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                            const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 18),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(error, style: AppTextStyles.body)),
+                            Expanded(child: Text(error, style: const TextStyle(color: Color(0xFFF87171), fontSize: 13))),
                           ],
                         ),
                       ),
                   ],
                 ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
+
         Row(
           children: [
             Expanded(
               child: OutlinedButton(
                 onPressed: _saveDraft,
-                child: const Text('Save Draft'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF7F5F0),
+                  side: const BorderSide(color: Color(0xFF2E2E38)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Save Draft', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: ElevatedButton(
                 onPressed: _publishing ? null : _publish,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
                 child: _publishing
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                       )
-                    : const Text('Publish Theatre'),
+                    : const Text('Publish Theatre', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],

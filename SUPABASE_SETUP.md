@@ -38,20 +38,43 @@ committed.
 
 ## 3. Run the database migration
 
-Open your Supabase project's **SQL Editor** and run the entire contents of:
+Open your Supabase project's **SQL Editor** and run, in order:
 
 ```
 supabase/migrations/0001_init.sql
+supabase/migrations/0002_platform_admin_verification.sql
+supabase/migrations/0003_show_booking_workflow.sql
+supabase/migrations/0004_shows_price_schema_repair.sql
+supabase/migrations/0005_shows_status_schema_repair.sql
+supabase/migrations/0006_theatre_admin_identity.sql
+supabase/migrations/0007_dev_theatre_admin_demo_seed.sql
+supabase/migrations/0008_movie_trailer_dual_assets.sql
+supabase/migrations/0009_theatre_delete_protection.sql
 ```
 
-This creates: `profiles`, `theatres`, `movies`, `shows`, `bookings`, all
-indexes, all Row Level Security policies, and two triggers (auto-create a
-`profiles` row on signup, auto-update `updated_at`).
+(0004/0005 above are prior fixes to the shows table; 0008 adds dual-trailer assets; 0009 adds database-level delete protection triggers preventing permanent deletion of theatres that have active shows or bookings, alongside RLS delete authorization.)
+
+`0006_theatre_admin_identity.sql` adds the Theatre Admin identity/multi-theatre
+ownership model: `theatre_admins` (operator/business identity, one per
+account, with a server-generated `TA-0001`-style admin code) and
+`theatre_admin_theatres` (the many-to-many "who may manage which theatre"
+relationship, with its own pending/verified workflow, reviewed by Platform
+Admin — separate from a theatre's own venue verification). It also
+backfills a verified relationship for every theatre that already exists,
+so nothing currently working stops working. See that file's header comment
+for full detail.
+
+If you want the three demo Theatre Admin accounts described in the task
+(one admin managing two theatres, a second and third admin each managing
+one), also run `supabase/migrations/0007_dev_theatre_admin_demo_seed.sql` —
+it is dev/demo-only (matches theatres by name) and its own header explains
+the one manual step it needs first (creating two more Supabase Auth users,
+same as step 4 below). Run it after 0006, never before.
 
 (If you use the Supabase CLI locally instead: `supabase db push` after
-linking the project, from the same file.)
+linking the project, applies both files in order.)
 
-## 4. Create the three demo accounts
+## 4. Create the four demo accounts
 
 Supabase Auth requires an email address, so the demo IDs map to:
 
@@ -60,22 +83,33 @@ Supabase Auth requires an email address, so the demo IDs map to:
 | `user_demo` | `user_demo@livescreen.local` | `User@123` | `user` |
 | `theatre_demo` | `theatre_demo@livescreen.local` | `Theatre@123` | `theatre_admin` |
 | `producer_demo` | `producer_demo@livescreen.local` | `Producer@123` | `producer` |
+| `platform_admin_demo` | `platform_admin_demo@livescreen.local` | `Platform@123` | `platform_admin` |
 
-You still type `user_demo` / `theatre_demo` / `producer_demo` into the
-LiveScreen login screen — the app maps that to the email above internally
-(see `lib/auth/services/supabase_auth_service.dart`).
+Two more Theatre Admin accounts, only needed if you're also running
+`0007_dev_theatre_admin_demo_seed.sql` (see above):
+
+| Demo ID | Email used for Supabase Auth | Password | Role |
+|---|---|---|---|
+| `theatre_demo_2` | `theatre_demo_2@livescreen.local` | `Theatre2@123` | `theatre_admin` |
+| `theatre_demo_3` | `theatre_demo_3@livescreen.local` | `Theatre3@123` | `theatre_admin` |
+
+You still type `user_demo` / `theatre_demo` / `producer_demo` /
+`platform_admin_demo` into the LiveScreen login screen — the app maps that
+to the email above internally (see
+`lib/auth/services/supabase_auth_service.dart`).
 
 **Create the auth users** — Supabase Dashboard -> Authentication -> Users ->
 "Add user" -> "Create new user":
 - Email: `user_demo@livescreen.local`, Password: `User@123`, toggle **Auto
   Confirm User** on (so it doesn't need email verification).
-- Repeat for `theatre_demo@livescreen.local` / `Theatre@123` and
-  `producer_demo@livescreen.local` / `Producer@123`.
+- Repeat for `theatre_demo@livescreen.local` / `Theatre@123`,
+  `producer_demo@livescreen.local` / `Producer@123`, and
+  `platform_admin_demo@livescreen.local` / `Platform@123`.
 
 **Assign roles** — the migration's trigger auto-creates a `profiles` row on
 signup, but defaults `role` to `'user'` unless metadata says otherwise (and
 the dashboard's "Add user" form doesn't expose custom metadata). So after
-creating the three users above, run this in the SQL Editor once to set the
+creating the four users above, run this in the SQL Editor once to set the
 correct roles:
 
 ```sql
@@ -85,9 +119,18 @@ update public.profiles set role = 'user', display_name = 'Demo User'
 update public.profiles set role = 'theatre_admin', display_name = 'Demo Theatre Admin'
   where email = 'theatre_demo@livescreen.local';
 
-update public.profiles set role = 'producer', display_name = 'Demo Producer'
+update public.profiles set role = 'producer', display_name = 'Demo Producer',
+    verification_status = 'verified'
   where email = 'producer_demo@livescreen.local';
+
+update public.profiles set role = 'platform_admin', display_name = 'Demo Platform Admin'
+  where email = 'platform_admin_demo@livescreen.local';
 ```
+
+(`producer_demo` is set straight to `verified` here purely so the existing
+demo walkthrough isn't blocked on a manual approval step — a real new
+producer signup still starts at `pending`, per the verification workflow in
+section 6.)
 
 If a `profiles` row didn't get created automatically for some reason
 (e.g. the trigger wasn't in place before you created the users), insert it
@@ -97,34 +140,57 @@ directly instead:
 insert into public.profiles (id, email, display_name, role)
 select id, email, 'Demo User', 'user' from auth.users where email = 'user_demo@livescreen.local'
 on conflict (id) do update set role = excluded.role;
--- repeat for theatre_demo@livescreen.local -> 'theatre_admin'
--- and producer_demo@livescreen.local -> 'producer'
+-- repeat for theatre_demo@livescreen.local -> 'theatre_admin',
+-- producer_demo@livescreen.local -> 'producer',
+-- and platform_admin_demo@livescreen.local -> 'platform_admin'
 ```
 
 ## 5. Required tables (created by the migration)
 
-- `profiles` — one row per auth user; `role` is `user` | `theatre_admin` | `producer`.
+- `profiles` — one row per auth user; `role` is `user` | `theatre_admin` |
+  `producer` | `platform_admin`. `verification_status` (producer accounts
+  only) is `pending` | `under_review` | `verified` | `rejected` | `suspended`.
 - `theatres` — one row per theatre; `owner_id` -> `profiles`, `status` is
   `draft` | `published` | `archived`, full Room/Screen/Seating/Speakers/
   Acoustics/Movie configuration stored as a `config` jsonb column (reusing
-  `TheatreConfiguration.toJson()`/`fromJson()` as-is).
+  `TheatreConfiguration.toJson()`/`fromJson()` as-is). `verification_status`
+  is the separate `pending` | `under_review` | `verified` | `rejected` |
+  `suspended` Platform Admin decision for this theatre — a theatre can only
+  become `published` once it is `verified`.
 - `movies` — one row per producer-owned movie; `producer_id` -> `profiles`,
-  `status` is `draft` | `published` | `archived`.
+  `status` is `draft` | `published` | `archived`. `approval_status` is the
+  separate `draft` | `submitted` | `under_review` | `approved` | `rejected`
+  Platform Admin decision — a movie can only become `published` once it is
+  `approved`.
 - `shows` — theatre + optional movie + start/end time.
 - `bookings` — user + theatre + optional show + seat, with two partial
   unique indexes preventing a seat from being double-booked.
+- `verification_audit_log` — one row per verification/approval/publish
+  status change, whoever made it (Platform Admin only for select).
 
 ## 6. Required RLS policies
 
-All in the migration file already. Summary:
-- **User**: read published theatres/movies/shows; read/create/update only
-  their own bookings.
+All in the migration files already. Summary:
+- **User**: read published-and-verified theatres, published-and-approved
+  movies, and shows; read/create/update only their own bookings. Cannot
+  verify, approve, or publish anything.
 - **Theatre Admin**: read/create/update only theatres they own (`owner_id =
-  auth.uid()`); read/create/update shows only for theatres they own.
+  auth.uid()`); read/create/update shows only for theatres they own. Cannot
+  change their own theatre's `verification_status` (rejected by the
+  `enforce_theatre_transition` trigger, not just hidden by the UI), and
+  cannot publish a theatre that isn't `verified`.
 - **Producer**: read/create/update only movies they own (`producer_id =
-  auth.uid()`).
+  auth.uid()`). Can move a movie between `draft`/`submitted`
+  (`approval_status`) themselves; cannot set `under_review`/`approved`/
+  `rejected`, and cannot publish — both rejected by the
+  `enforce_movie_transition` trigger.
+- **Platform Admin**: can read and update every theatre, producer profile,
+  and movie regardless of owner (`*_select_platform_admin` /
+  `*_update_platform_admin` policies), and is the only role the
+  `enforce_*_transition` triggers allow to set `verification_status` /
+  `approval_status` / review metadata, or a producer's `role`.
 - Nobody can read another user's `profiles` row, another admin's draft
-  theatre, or another producer's draft movie.
+  theatre, or another producer's draft movie — except Platform Admin.
 
 ## 7. Run the app
 
@@ -133,7 +199,7 @@ flutter pub get
 flutter run -d chrome
 ```
 
-Log in with any of the three demo accounts (also shown directly on the
+Log in with any of the four demo accounts (also shown directly on the
 login screen).
 
 ## Known limitation

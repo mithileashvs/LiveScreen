@@ -7,8 +7,8 @@ import '../data/demo_data.dart';
 import 'unity_experience_screen.dart';
 import 'booking_summary_screen.dart';
 
-/// Interactive seat map. The user taps a seat to see its details,
-/// then can either experience it first or select it directly.
+/// Interactive cinema seat map matching the LiveScreen visual system.
+/// Immersive cinema palette: Deep Navy, Gold, White, Neutral Grey (No purple).
 class SeatSelectionScreen extends StatefulWidget {
   final EventModel event;
   final VenueModel venue;
@@ -45,13 +45,23 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       case SeatType.booked:
         return AppColors.seatBooked;
       case SeatType.premium:
-        return AppColors.seatPremium;
+        return AppColors.seatPremium; // Deep Navy #0B1F3A
       case SeatType.recliner:
         return AppColors.seatRecliner;
       case SeatType.available:
       case SeatType.selected:
         return AppColors.seatAvailable;
     }
+  }
+
+  Border? _borderFor(SeatModel seat) {
+    if (seat == _selectedSeat) {
+      return Border.all(color: AppColors.accentSoft, width: 1.5);
+    }
+    if (seat.type == SeatType.available) {
+      return Border.all(color: AppColors.border, width: 1);
+    }
+    return null;
   }
 
   void _onSeatTap(SeatModel seat) {
@@ -67,45 +77,54 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Select Your Seat')),
+      appBar: AppBar(
+        title: const Text('Select Your Seat', style: AppTextStyles.heading),
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: AppColors.border, height: 1),
+        ),
+      ),
       body: Column(
         children: [
+          // Screen Indicator
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 24),
             child: Column(
               children: [
                 Container(
-                  width: 240,
+                  width: 280,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: AppColors.electricBlue.withValues(alpha: 0.6),
+                    color: AppColors.navy,
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.electricBlue.withValues(alpha: 0.4),
-                        blurRadius: 12,
+                        color: AppColors.navy.withValues(alpha: 0.25),
+                        blurRadius: 10,
                         spreadRadius: 1,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('SCREEN', style: AppTextStyles.caption.copyWith(letterSpacing: 3)),
+                Text(
+                  'SCREEN',
+                  style: AppTextStyles.caption.copyWith(
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navy,
+                  ),
+                ),
               ],
             ),
           ),
+          // Seat Map Grid
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Rows are wider than most phone screens once the aisle gap
-                // is included, so this whole seat map scrolls horizontally
-                // when it needs to. But a plain horizontal SingleChildScrollView
-                // always pins its content to the left when the content is
-                // narrower than the viewport (e.g. on a wide window/tablet) —
-                // it never centers on its own. Forcing a minWidth equal to the
-                // viewport width, combined with Column's default center
-                // cross-axis alignment below, makes the grid center itself
-                // when it fits and scroll normally when it doesn't.
                 const horizontalPadding = 16.0;
                 final viewportWidth = constraints.maxWidth - (horizontalPadding * 2);
                 return SingleChildScrollView(
@@ -115,13 +134,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: viewportWidth),
                       child: Column(
-                        // Default CrossAxisAlignment.center: centers each row
-                        // within the Column's width (which is at least the
-                        // full viewport width thanks to the constraint above).
                         children: rows.map((row) {
                           final rowSeats = _seats.where((s) => s.row == row).toList();
-                          // Seat numbers after which Unity draws an aisle gap —
-                          // keeps the app's layout visually aligned with the 3D venue.
                           final aisleGaps = DemoData.aisleGapsAfterSeatNumber();
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 5),
@@ -129,8 +143,14 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 SizedBox(
-                                  width: 20,
-                                  child: Text(row, style: AppTextStyles.caption),
+                                  width: 22,
+                                  child: Text(
+                                    row,
+                                    style: AppTextStyles.caption.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 for (final seat in rowSeats) ...[
@@ -139,10 +159,20 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                                     child: Container(
                                       width: 26,
                                       height: 26,
-                                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
                                       decoration: BoxDecoration(
                                         color: _colorFor(seat),
                                         borderRadius: BorderRadius.circular(6),
+                                        border: _borderFor(seat),
+                                        boxShadow: seat == _selectedSeat
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.accent.withValues(alpha: 0.4),
+                                                  blurRadius: 6,
+                                                  spreadRadius: 1,
+                                                ),
+                                              ]
+                                            : null,
                                       ),
                                     ),
                                   ),
@@ -160,87 +190,151 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+          // Legend
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            color: AppColors.surface,
             child: Wrap(
-              spacing: 16,
+              spacing: 18,
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _legendDot(AppColors.seatAvailable, 'Available'),
-                _legendDot(AppColors.seatSelected, 'Selected'),
-                _legendDot(AppColors.seatBooked, 'Booked'),
-                _legendDot(AppColors.seatPremium, 'Premium'),
-                _legendDot(AppColors.seatRecliner, 'Recliner'),
+                _legendItem(AppColors.seatAvailable, 'Available', hasBorder: true),
+                _legendItem(AppColors.seatSelected, 'Selected'),
+                _legendItem(AppColors.seatBooked, 'Occupied'),
+                _legendItem(AppColors.seatPremium, 'Premium (Navy)'),
+                _legendItem(AppColors.seatRecliner, 'Recliner'),
               ],
             ),
           ),
+          // Bottom selection action bar
           if (_selectedSeat != null)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Seat ${_selectedSeat!.label}', style: AppTextStyles.subheading),
-                          Text('₹${_selectedSeat!.price.toInt()}', style: AppTextStyles.body.copyWith(color: AppColors.accent, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => UnityExperienceScreen(
-                                  seatLabel: _selectedSeat!.label,
-                                ),
-                              ),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: AppColors.accent),
-                          ),
-                          child: const Text('Experience This Seat', style: TextStyle(color: AppColors.accent)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => BookingSummaryScreen(
-                                  event: widget.event,
-                                  venue: widget.venue,
-                                  screenName: widget.screenName,
-                                  date: widget.date,
-                                  time: widget.time,
-                                  seat: _selectedSeat!,
-                                ),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                          child: const Text('Select Seat'),
-                        ),
-                      ),
-                    ],
+                border: const Border(top: BorderSide(color: AppColors.border)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, -2),
                   ),
                 ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Seat ${_selectedSeat!.label}  •  1 Ticket',
+                              style: AppTextStyles.subheading.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '₹${_selectedSeat!.price.toInt()}',
+                              style: const TextStyle(
+                                color: AppColors.accentSoft,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        // Experience This Seat (Unity Integration)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => UnityExperienceScreen(
+                                    seatLabel: _selectedSeat!.label,
+                                    // DEMO-ONLY PATH. This screen's seats
+                                    // come from DemoData.generateSeats(),
+                                    // not from any saved theatre, so there
+                                    // is no TheatreConfiguration to send.
+                                    // Explicitly null: Unity shows its
+                                    // generic auditorium plus a visible
+                                    // "Demo venue" badge. The real booking
+                                    // path is TheatreSeatSelectionScreen,
+                                    // which passes a real theatre.
+                                    theatre: null,
+                                    // Same demo-data reasoning: widget.event
+                                    // is an EventModel (DemoData), not a
+                                    // MovieContent — there's nothing real
+                                    // to send.
+                                    movie: null,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.view_in_ar_rounded,
+                              size: 18,
+                              color: AppColors.navy,
+                            ),
+                            label: const Text('Experience This Seat'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.navy,
+                              side: const BorderSide(color: AppColors.navy, width: 1.2),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        // Proceed to Booking
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => BookingSummaryScreen(
+                                    event: widget.event,
+                                    venue: widget.venue,
+                                    screenName: widget.screenName,
+                                    date: widget.date,
+                                    time: widget.time,
+                                    seat: _selectedSeat!,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.navy,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            child: const Text('Proceed to Booking →'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -248,13 +342,27 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     );
   }
 
-  Widget _legendDot(Color color, String label) {
+  Widget _legendItem(Color color, String label, {bool hasBorder = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: hasBorder ? Border.all(color: AppColors.border) : null,
+          ),
+        ),
         const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.caption),
+        Text(
+          label,
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../models/acoustics_config.dart';
-import '../../models/screen_config.dart';
 import '../../models/theatre_configuration.dart';
 
 class AcousticsTab extends StatefulWidget {
@@ -20,21 +18,23 @@ class _AcousticsTabState extends State<AcousticsTab> {
     final acoustics = widget.config.acoustics;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       children: [
-        const Text('Room / Acoustic Properties', style: AppTextStyles.subheading),
+        const Text(
+          'Room / Acoustic Properties',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+        ),
         const SizedBox(height: 4),
         const Text(
-          'This is stored for the future spatial-audio engine — no simulation '
-          'runs on this data yet.',
-          style: AppTextStyles.caption,
+          'Spatial-audio simulation parameters and surface materials for audio engineering.',
+          style: TextStyle(fontSize: 12.5, color: Color(0xFF9CA3AF)),
         ),
         const SizedBox(height: 20),
-        _surfaceSection('Floor', acoustics.floor),
+        _surfaceSection('Floor Surface', acoustics.floor),
         const SizedBox(height: 16),
-        _surfaceSection('Walls', acoustics.walls),
+        _surfaceSection('Wall Treatments', acoustics.walls),
         const SizedBox(height: 16),
-        _surfaceSection('Ceiling', acoustics.ceiling),
+        _surfaceSection('Ceiling Baffles', acoustics.ceiling),
         const SizedBox(height: 24),
         _panelsSection(acoustics),
         const SizedBox(height: 24),
@@ -45,24 +45,29 @@ class _AcousticsTabState extends State<AcousticsTab> {
 
   Widget _surfaceSection(String title, SurfaceAcoustics surface) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF0F0F12),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E26)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.subheading),
-          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF))),
+          const SizedBox(height: 12),
           TextFormField(
             key: ValueKey('$title-material'),
             initialValue: surface.material,
-            style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'Material',
-              labelStyle: AppTextStyles.caption,
-              border: OutlineInputBorder(),
+            style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13),
+            decoration: InputDecoration(
+              labelText: 'Material Name',
+              labelStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+              filled: true,
+              fillColor: const Color(0xFF14141A),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
               isDense: true,
             ),
             onChanged: (v) {
@@ -70,16 +75,23 @@ class _AcousticsTabState extends State<AcousticsTab> {
               widget.onChanged();
             },
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Absorption Coefficient: ${surface.absorptionCoefficient.toStringAsFixed(2)}',
-            style: AppTextStyles.caption,
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Absorption Coefficient', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+              Text(
+                surface.absorptionCoefficient.toStringAsFixed(2),
+                style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ],
           ),
           Slider(
             value: surface.absorptionCoefficient,
             min: 0,
             max: 1,
-            activeColor: AppColors.accent,
+            activeColor: const Color(0xFFD4AF37),
+            inactiveColor: const Color(0xFF22222A),
             onChanged: (v) => setState(() {
               surface.absorptionCoefficient = v;
               widget.onChanged();
@@ -92,92 +104,70 @@ class _AcousticsTabState extends State<AcousticsTab> {
 
   Widget _panelsSection(AcousticsConfig acoustics) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF0F0F12),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E26)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Expanded(child: Text('Acoustic Panels', style: AppTextStyles.subheading)),
-              TextButton.icon(
+              const Text(
+                'Acoustic Panels',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+              ),
+              ElevatedButton.icon(
                 onPressed: () {
                   setState(() {
-                    acoustics.panels.add(AcousticPanelConfig(
-                      id: 'panel_${acoustics.panels.length + 1}',
-                      position: Position3(x: 0, y: 2, z: 0),
-                    ));
-                    widget.onChanged();
+                    acoustics.panels.add(
+                      AcousticPanelConfig(
+                        id: 'panel-${DateTime.now().millisecondsSinceEpoch}',
+                        material: 'Acoustic Foam',
+                        coverageSqm: 2.0,
+                      ),
+                    );
                   });
+                  widget.onChanged();
                 },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add'),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Panel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
           if (acoustics.panels.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('No acoustic panels configured.', style: AppTextStyles.caption),
-            ),
-          for (final panel in acoustics.panels)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(
+            const Text('No panels installed.', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12))
+          else
+            for (int i = 0; i < acoustics.panels.length; i++) ...[
+              if (i > 0) const Divider(height: 20, color: Color(0xFF1E1E26)),
+              Row(
                 children: [
                   Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      key: ValueKey('${panel.id}-material'),
-                      initialValue: panel.material,
-                      style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Material',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (v) {
-                        panel.material = v;
-                        widget.onChanged();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      key: ValueKey('${panel.id}-coverage'),
-                      initialValue: panel.coverageSqm.toString(),
-                      keyboardType: TextInputType.number,
-                      style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Coverage m²',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (v) {
-                        final parsed = double.tryParse(v);
-                        if (parsed != null) {
-                          panel.coverageSqm = parsed;
-                          widget.onChanged();
-                        }
-                      },
+                    child: Text(
+                      'Panel ${i + 1} (${acoustics.panels[i].material}, ${acoustics.panels[i].coverageSqm.toStringAsFixed(1)} m²)',
+                      style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
                     onPressed: () {
-                      setState(() {
-                        acoustics.panels.removeWhere((p) => p.id == panel.id);
-                        widget.onChanged();
-                      });
+                      setState(() => acoustics.panels.removeAt(i));
+                      widget.onChanged();
                     },
                   ),
                 ],
               ),
-            ),
+            ],
         ],
       ),
     );
@@ -185,37 +175,44 @@ class _AcousticsTabState extends State<AcousticsTab> {
 
   Widget _curtainSection(CurtainConfig curtain) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF0F0F12),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E26)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(child: Text('Curtains', style: AppTextStyles.subheading)),
-              Switch(
-                value: curtain.enabled,
-                activeThumbColor: AppColors.accent,
-                onChanged: (v) => setState(() {
-                  curtain.enabled = v;
-                  widget.onChanged();
-                }),
-              ),
-            ],
+          const Text(
+            'Stage Curtain Acoustics',
+            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Has Stage Curtain', style: TextStyle(color: Color(0xFFF7F5F0), fontSize: 13.5)),
+            value: curtain.enabled,
+            activeThumbColor: const Color(0xFFD4AF37),
+            onChanged: (v) => setState(() {
+              curtain.enabled = v;
+              widget.onChanged();
+            }),
           ),
           if (curtain.enabled) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             TextFormField(
-              key: const ValueKey('curtain-material'),
               initialValue: curtain.material,
-              style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Material',
+              style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Curtain Material',
+                labelStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                filled: true,
+                fillColor: const Color(0xFF14141A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
                 isDense: true,
-                border: OutlineInputBorder(),
               ),
               onChanged: (v) {
                 curtain.material = v;

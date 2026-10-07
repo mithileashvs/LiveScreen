@@ -12,6 +12,7 @@ class BookingModel {
   final String? showId;
   final String seatId;
   final String status; // confirmed | cancelled
+  final DateTime? createdAt;
 
   const BookingModel({
     required this.id,
@@ -20,6 +21,7 @@ class BookingModel {
     this.showId,
     required this.seatId,
     this.status = 'confirmed',
+    this.createdAt,
   });
 
   factory BookingModel.fromRow(Map<String, dynamic> row) {
@@ -30,6 +32,7 @@ class BookingModel {
       showId: row['show_id'] as String?,
       seatId: row['seat_id'] as String,
       status: row['status'] as String? ?? 'confirmed',
+      createdAt: row['created_at'] != null ? DateTime.tryParse(row['created_at'].toString()) : null,
     );
   }
 }

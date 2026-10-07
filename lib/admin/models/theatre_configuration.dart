@@ -36,17 +36,32 @@ class TheatreBasicInfo {
   String name;
   String hallName;
   String description;
+  String address;
+  String city;
+  String state;
+  String country;
+  String contactNumber;
 
   TheatreBasicInfo({
     this.name = '',
     this.hallName = '',
     this.description = '',
+    this.address = '',
+    this.city = '',
+    this.state = '',
+    this.country = '',
+    this.contactNumber = '',
   });
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'hallName': hallName,
         'description': description,
+        'address': address,
+        'city': city,
+        'state': state,
+        'country': country,
+        'contactNumber': contactNumber,
       };
 
   factory TheatreBasicInfo.fromJson(Map<String, dynamic> json) {
@@ -54,6 +69,11 @@ class TheatreBasicInfo {
       name: json['name'] as String? ?? '',
       hallName: json['hallName'] as String? ?? '',
       description: json['description'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      city: json['city'] as String? ?? '',
+      state: json['state'] as String? ?? '',
+      country: json['country'] as String? ?? '',
+      contactNumber: json['contactNumber'] as String? ?? '',
     );
   }
 }
@@ -77,6 +97,22 @@ class TheatreConfiguration {
   MovieContent? content;
   TheatreStatus status;
 
+  /// pending | under_review | verified | rejected | suspended — Platform
+  /// Admin's verification decision for THIS theatre entity. Deliberately
+  /// separate from [status] (draft/published/archived), which only tracks
+  /// publish state. Always populated from the `theatres.verification_status`
+  /// database column (see SupabaseTheatreRepository._fromRow), never from
+  /// this object's own jsonb snapshot, since only Platform Admin ever
+  /// changes it and a Theatre Admin's local save must never be able to.
+  String verificationStatus;
+
+  /// Set by Platform Admin when rejecting or requesting changes.
+  String? reviewReason;
+
+  /// Owning Theatre Admin's user id — populated from the row, used by the
+  /// Platform Admin verification screens to show "owner" information.
+  String? ownerId;
+
   /// The seat-grid parameters last used to generate [seats] (PART 4).
   /// Kept so re-opening a theatre in the editor shows the values that
   /// actually produced the current seats, instead of resetting the
@@ -94,6 +130,9 @@ class TheatreConfiguration {
     AcousticsConfig? acoustics,
     this.content,
     this.status = TheatreStatus.draft,
+    this.verificationStatus = 'pending',
+    this.reviewReason,
+    this.ownerId,
     this.lastSeatLayout,
   })  : basicInfo = basicInfo ?? TheatreBasicInfo(),
         room = room ?? RoomConfig(),
@@ -113,6 +152,9 @@ class TheatreConfiguration {
         'acoustics': acoustics.toJson(),
         'content': content?.toJson(),
         'status': status.name,
+        'verificationStatus': verificationStatus,
+        'reviewReason': reviewReason,
+        'ownerId': ownerId,
         'lastSeatLayout': lastSeatLayout?.toJson(),
       };
 
@@ -146,6 +188,9 @@ class TheatreConfiguration {
             (s) => s.name == json['status'],
             orElse: () => TheatreStatus.draft,
           ),
+          verificationStatus: json['verificationStatus'] as String? ?? 'pending',
+          reviewReason: json['reviewReason'] as String?,
+          ownerId: json['ownerId'] as String?,
           lastSeatLayout: json['lastSeatLayout'] == null
               ? null
               : SeatLayoutParams.fromJson(json['lastSeatLayout'] as Map<String, dynamic>),
