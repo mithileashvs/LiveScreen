@@ -8,6 +8,7 @@ import 'tabs/speakers_tab.dart';
 import 'tabs/acoustics_tab.dart';
 import 'tabs/movie_tab.dart';
 import 'tabs/preview_publish_tab.dart';
+import '../capture/ui/venue_capture_screen.dart';
 
 /// The Redesigned LiveScreen Theatre Studio Editor.
 /// Hosts configuration surfaces for one theatre in the master dark cinematic design language:
@@ -106,6 +107,28 @@ class _TheatreEditorScreenState extends State<TheatreEditorScreen> {
             icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFFD4AF37)),
             onPressed: () => Navigator.of(context).pop(),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.document_scanner_outlined, color: Color(0xFFD4AF37)),
+              tooltip: 'AI Venue Capture',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => VenueCaptureScreen(
+                      theatreId: config.id,
+                      initialConfig: config,
+                      onConfigurationUpdated: (updated) {
+                        setState(() {
+                          _config = updated;
+                        });
+                        theatreRepository.saveTheatre(updated);
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             isScrollable: true,
             indicatorColor: Color(0xFFD4AF37),

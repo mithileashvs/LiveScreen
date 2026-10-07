@@ -3,6 +3,7 @@ import '../models/room_config.dart';
 import '../models/theatre_configuration.dart';
 import '../services/theatre_admin_repository.dart';
 import '../services/theatre_repository.dart';
+import '../capture/ui/venue_capture_screen.dart';
 
 /// "Add Theatre" Screen for Theatre Admin.
 /// Styled in the master dark cinematic design language (Black, Gold & Burgundy).
@@ -163,9 +164,42 @@ class _CreateTheatreScreenState extends State<CreateTheatreScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Room Dimensions (metres)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Room Dimensions (metres)',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF)),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.document_scanner_outlined, color: Color(0xFFD4AF37), size: 16),
+                  label: const Text('Capture with AI', style: TextStyle(color: Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF14141A),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      side: const BorderSide(color: Color(0xFF2E2E38)),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => VenueCaptureScreen(
+                          theatreId: 'new-theatre-draft',
+                          onConfigurationUpdated: (updated) {
+                            setState(() {
+                              _widthController.text = updated.room.width.toString();
+                              _lengthController.text = updated.room.length.toString();
+                              _heightController.text = updated.room.height.toString();
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             Row(
