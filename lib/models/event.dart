@@ -27,3 +27,4 @@ class EventModel {
     this.rating = 8.0,
   });
 }
+

@@ -7,7 +7,8 @@ class ShowModel {
   final String? movieId;
   final DateTime startTime;
   final DateTime? endTime;
-  final String status; // scheduled | cancelled | completed
+  final String status; // draft | published | cancelled | completed
+  final double price;
 
   const ShowModel({
     required this.id,
@@ -15,7 +16,8 @@ class ShowModel {
     this.movieId,
     required this.startTime,
     this.endTime,
-    this.status = 'scheduled',
+    this.status = 'draft',
+    this.price = 0,
   });
 
   factory ShowModel.fromRow(Map<String, dynamic> row) {
@@ -25,7 +27,8 @@ class ShowModel {
       movieId: row['movie_id'] as String?,
       startTime: DateTime.parse(row['start_time'] as String),
       endTime: row['end_time'] == null ? null : DateTime.parse(row['end_time'] as String),
-      status: row['status'] as String? ?? 'scheduled',
+      status: row['status'] as String? ?? 'draft',
+      price: (row['price'] as num?)?.toDouble() ?? 0,
     );
   }
 }

@@ -66,7 +66,15 @@ public class ExperienceController : MonoBehaviour
         }
 
         IsExperienceActive = true;
-        CurrentSession = new ExperienceSession(seat);
+        // Tag the session with the theatre it actually belongs to, rather
+        // than the literal "demo_venue" placeholder — analytics that can't
+        // tell two theatres apart is worse than no analytics.
+        TheatreConfigPayload config = VenueGenerator.Instance != null
+            ? VenueGenerator.Instance.Configuration
+            : null;
+        CurrentSession = config == null
+            ? new ExperienceSession(seat)
+            : new ExperienceSession(seat, config.theatreId, config.theatreName);
 
         if (_orbitCamera != null)
         {
@@ -96,6 +104,12 @@ public class ExperienceController : MonoBehaviour
 
         IsExperienceActive = false;
         CurrentSession = null;
+
+        // If a trailer was playing on the cinema screen, stop it now —
+        // otherwise its VideoPlayer/RenderTexture/routed AudioSource would
+        // keep running after the user has left the seat experience
+        // entirely. Safe to call even when nothing is currently playing.
+        TrailerScreenPlayer.Instance?.Stop();
 
         if (_transitionCoroutine != null) StopCoroutine(_transitionCoroutine);
         _transitionCoroutine = StartCoroutine(TransitionCamera(_savedPreviewPosition, _savedPreviewRotation, _savedFieldOfView, onComplete: () =>

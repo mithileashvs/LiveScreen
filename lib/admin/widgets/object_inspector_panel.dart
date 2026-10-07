@@ -1,24 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 
-/// One editable row shown in an [ObjectInspectorPanel] (PART 9). Kept as a
-/// tiny type hierarchy rather than a big config map, so adding a new field
-/// kind later (e.g. a slider) is a new subclass, not a rewrite.
-///
-/// Each subtype builds its OWN editor widget via [build] rather than
-/// [ObjectInspectorPanel] switching on `is SomeFieldType` from the outside.
-/// This matters specifically for [InspectorDropdownField]'s generic type
-/// parameter T: a bare `field is InspectorDropdownField` check (with no
-/// type argument) promotes the reference to `InspectorDropdownField<dynamic>`,
-/// and Dart then has to insert an implicit runtime cast when reading a
-/// T-typed member back off it — e.g. `String Function(SpeakerType)` being
-/// coerced down to `String Function(dynamic)`. That cast is unsound
-/// (function parameters are contravariant, and `dynamic` is not a subtype
-/// of `SpeakerType`), so it throws a `TypeError` at the exact point the
-/// dropdown tries to render — which is exactly the runtime error this
-/// fixes. Letting each field build itself keeps T inside the generic
-/// class's own scope, where it's always concretely known, so that cast
-/// never has to happen.
 abstract class InspectorField {
   final String label;
   const InspectorField(this.label);
@@ -40,17 +21,27 @@ class InspectorTextField extends InspectorField {
 
   @override
   Widget build() {
-    return TextFormField(
-      initialValue: initialValue,
-      keyboardType: keyboardType,
-      style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: AppTextStyles.caption,
-        isDense: true,
-        border: const OutlineInputBorder(),
-      ),
-      onChanged: onChanged,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11.5)),
+        const SizedBox(height: 5),
+        TextFormField(
+          initialValue: initialValue,
+          keyboardType: keyboardType,
+          style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF14141A),
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF22222A))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
@@ -71,27 +62,38 @@ class InspectorDropdownField<T> extends InspectorField {
 
   @override
   Widget build() {
-    // T is concretely known right here (e.g. SpeakerType, ScreenType,
-    // SeatCategory) — DropdownButtonFormField<T> and labelBuilder(option)
-    // both stay properly typed the whole way through, no dynamic involved.
-    return DropdownButtonFormField<T>(
-      initialValue: value,
-      items: [
-        for (final option in options)
-          DropdownMenuItem<T>(
-            value: option,
-            child: Text(labelBuilder(option), style: AppTextStyles.body),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11.5)),
+        const SizedBox(height: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF14141A),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF22222A)),
           ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF14141A),
+              style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13),
+              items: [
+                for (final option in options)
+                  DropdownMenuItem<T>(
+                    value: option,
+                    child: Text(labelBuilder(option)),
+                  ),
+              ],
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ),
       ],
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: AppTextStyles.caption,
-        isDense: true,
-        border: const OutlineInputBorder(),
-      ),
     );
   }
 }
@@ -110,10 +112,11 @@ class InspectorSwitchField extends InspectorField {
   Widget build() {
     return Row(
       children: [
-        Expanded(child: Text(label, style: AppTextStyles.body)),
+        Expanded(child: Text(label, style: const TextStyle(color: Color(0xFFF7F5F0), fontSize: 13))),
         Switch(
           value: value,
-          activeThumbColor: AppColors.accent,
+          activeThumbColor: const Color(0xFFD4AF37),
+          activeTrackColor: const Color(0xFFD4AF37).withValues(alpha: 0.5),
           onChanged: onChanged,
         ),
       ],
@@ -121,15 +124,6 @@ class InspectorSwitchField extends InspectorField {
   }
 }
 
-/// Shows a selected object's editable properties (PART 9: "SELECTED SPEAKER
-/// / SELECTED SEAT / SCREEN" panels), driven entirely by a list of
-/// [InspectorField]s so the same widget serves seats, speakers, and the
-/// screen without three near-duplicate panels.
-///
-/// [objectId] MUST uniquely identify whichever object is currently shown
-/// (e.g. a seat or speaker ID) — it's used to key every field's live text
-/// state, so switching from one object to another resets each field to
-/// that new object's values instead of a stale, previously-typed one.
 class ObjectInspectorPanel extends StatelessWidget {
   final String objectId;
   final String title;
@@ -155,8 +149,9 @@ class ObjectInspectorPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF0F0F12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E1E26)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,15 +163,20 @@ class ObjectInspectorPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title.toUpperCase(), style: AppTextStyles.caption),
-                    if (subtitle != null)
-                      Text(subtitle!, style: AppTextStyles.subheading),
+                    Text(
+                      title.toUpperCase(),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD4AF37), letterSpacing: 1),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFFFFFFF))),
+                    ],
                   ],
                 ),
               ),
               if (onClose != null)
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textMuted),
+                  icon: const Icon(Icons.close, color: Color(0xFF9CA3AF), size: 18),
                   onPressed: onClose,
                 ),
             ],
@@ -185,23 +185,30 @@ class ObjectInspectorPanel extends StatelessWidget {
           for (final field in fields) ...[
             KeyedSubtree(
               key: ValueKey('$objectId::${field.label}'),
-              // field.build() — polymorphic, no external type switch, no
-              // dynamic cast (see the class-level doc comment above).
               child: field.build(),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
           ],
+          const SizedBox(height: 4),
           Row(
             children: [
               if (onDelete != null) ...[
                 TextButton(
                   onPressed: onDelete,
-                  child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+                  child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
                 ),
                 const Spacer(),
               ] else
                 const Spacer(),
-              ElevatedButton(onPressed: onSave, child: const Text('Save')),
+              ElevatedButton(
+                onPressed: onSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Apply Changes', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
             ],
           ),
         ],

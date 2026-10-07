@@ -1,21 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import '../models/room_config.dart';
 import '../models/screen_config.dart';
 import '../models/seat_config.dart';
 import '../models/speaker_model.dart';
 
-/// PART 8: the visual theatre editor. A top-down 2D layout — not a live
-/// Unity render — showing the room, screen, seats, and speakers to scale,
-/// with tap-to-select on everything and drag-to-move on the screen and
-/// speakers (seats are auto-laid-out by [SeatLayoutGenerator] rather than
-/// freely dragged, keeping rows straight; an admin adjusts a seat's exact
-/// position via the object inspector instead if it ever needs to differ
-/// from the generated grid).
-///
-/// World coordinates are metres, X = left/right, Z = front(screen)/back —
-/// the same convention the existing Unity project already uses, so this
-/// reads the same numbers Unity would.
+/// Top-down 2D Theatre Layout Canvas for Theatre Studio.
+/// Visualizes the room, screen, seats, and speakers in the dark cinema aesthetic.
 class VisualTheatreCanvas extends StatelessWidget {
   final RoomConfig room;
   final ScreenConfig screen;
@@ -72,9 +62,16 @@ class VisualTheatreCanvas extends StatelessWidget {
               width: canvasW,
               height: canvasH,
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border.all(color: AppColors.surfaceElevated, width: 2),
-                borderRadius: BorderRadius.circular(4),
+                color: const Color(0xFF0F0F12),
+                border: Border.all(color: const Color(0x66D4AF37), width: 1.5),
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Stack(
                 clipBehavior: Clip.none,
@@ -107,7 +104,7 @@ class VisualTheatreCanvas extends StatelessWidget {
             decoration: BoxDecoration(
               color: _colorForCategory(seat.category),
               borderRadius: BorderRadius.circular(2),
-              border: isSelected ? Border.all(color: AppColors.accent, width: 2) : null,
+              border: isSelected ? Border.all(color: const Color(0xFFD4AF37), width: 2) : null,
             ),
           ),
         ),
@@ -129,12 +126,21 @@ class VisualTheatreCanvas extends StatelessWidget {
           width: w,
           height: 12,
           decoration: BoxDecoration(
-            color: AppColors.electricBlue,
+            color: const Color(0xFFD4AF37),
             borderRadius: BorderRadius.circular(4),
-            border: isSelected ? Border.all(color: AppColors.accent, width: 2) : null,
+            border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: const Center(
-            child: Text('SCREEN', style: TextStyle(fontSize: 8, color: Colors.black)),
+            child: Text(
+              'SCREEN',
+              style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.black, letterSpacing: 1),
+            ),
           ),
         ),
       ),
@@ -156,17 +162,17 @@ class VisualTheatreCanvas extends StatelessWidget {
             width: speakerSize,
             height: speakerSize,
             decoration: BoxDecoration(
-              color: speaker.enabled ? AppColors.surfaceElevated :  AppColors.surfaceElevated.withValues(alpha: 0.4),
+              color: speaker.enabled ? const Color(0xFF1C180E) : const Color(0xFF141418),
               shape: BoxShape.circle,
               border: Border.all(
-                color: isSelected ? AppColors.accent : AppColors.textMuted,
+                color: isSelected ? const Color(0xFFD4AF37) : const Color(0xFF6B7280),
                 width: isSelected ? 2 : 1,
               ),
             ),
             child: Icon(
               Icons.volume_up,
-              size: 14,
-              color: speaker.enabled ? AppColors.textPrimary : AppColors.textMuted,
+              size: 13,
+              color: speaker.enabled ? const Color(0xFFD4AF37) : const Color(0xFF6B7280),
             ),
           ),
         ),
@@ -177,11 +183,11 @@ class VisualTheatreCanvas extends StatelessWidget {
   Color _colorForCategory(SeatCategory category) {
     switch (category) {
       case SeatCategory.premium:
-        return AppColors.seatPremium;
+        return const Color(0xFFD4AF37); // Gold for Premium
       case SeatCategory.recliner:
-        return AppColors.seatRecliner;
+        return const Color(0xFF9E102F); // Burgundy for Recliner
       case SeatCategory.standard:
-        return AppColors.seatAvailable;
+        return const Color(0xFF6B7280); // Neutral grey for Standard
     }
   }
 }

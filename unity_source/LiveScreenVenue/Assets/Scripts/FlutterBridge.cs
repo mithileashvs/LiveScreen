@@ -30,6 +30,27 @@ public class FlutterBridge : MonoBehaviour
     private void Awake()
     {
         gameObject.name = "FlutterBridge";
+
+        // Runtime-added rather than requiring a manual Editor step to drop
+        // it onto this (or any) GameObject — same object FlutterBridge
+        // lives on is a convenient, already-persistent home for it.
+        if (GetComponent<TrailerScreenPlayer>() == null)
+        {
+            gameObject.AddComponent<TrailerScreenPlayer>();
+        }
+
+        // Tell VenueGenerator not to build this scene's default venue on
+        // Start. In a real build, Flutter is about to send this theatre's
+        // configuration; generating first would show the scene's default
+        // room (the "old demo theatre") for the moment in between — and
+        // permanently, if the configuration never arrived.
+        //
+        // Guarded to WebGL so the Unity Editor still builds a venue
+        // immediately for the in-editor generator panel, which has no
+        // Flutter to talk to.
+#if UNITY_WEBGL && !UNITY_EDITOR
+        VenueGenerator.DeferInitialGenerate = true;
+#endif
     }
 
     private void Start()
@@ -43,9 +64,11 @@ public class FlutterBridge : MonoBehaviour
     /// TheatreUnityBridge.toUnityVenueParametersJson on the Dart side for
     /// exactly what's in the JSON and why.
     ///
-    /// Only overwrites the specific room/screen/seating-layout fields
-    /// Flutter actually sends; everything else this scene has configured
-    /// (lighting, aisle count, headroom, eye heights, etc.) is left alone.
+    /// Overwrites the room/screen/seating fields the theatre actually
+    /// defines, and places the theatre's OWN saved seats and speakers;
+    /// everything else this scene has configured (lighting, aisle count,
+    /// headroom, eye heights, etc.) is left alone, since no theatre owner
+    /// configures those.
     /// Regenerates the venue afterward so the change actually takes visual
     /// effect, then acks so Flutter knows it's safe to send the seat
     /// command — sending the seat command before this finishes could have
@@ -59,47 +82,62 @@ public class FlutterBridge : MonoBehaviour
         VenueGenerator venueGenerator = VenueGenerator.Instance;
         if (venueGenerator == null)
         {
-            Debug.LogWarning("[FlutterBridge] No VenueGenerator found — cannot apply configuration.");
-            NotifyFlutter("configuration_loaded");
+            Debug.LogError("[FlutterBridge] No VenueGenerator found — cannot apply configuration.");
+            NotifyFlutter("configuration_failed:no_venue_generator");
             return;
         }
 
-        VenueParameters incoming;
+        TheatreConfigPayload payload;
         try
         {
-            incoming = JsonUtility.FromJson<VenueParameters>(json);
+            payload = JsonUtility.FromJson<TheatreConfigPayload>(json);
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[FlutterBridge] Could not parse configuration JSON: {e.Message}");
-            NotifyFlutter("configuration_loaded");
+            // Previously this warned and then acked 'configuration_loaded'
+            // anyway, so Flutter believed the theatre had been applied and
+            // went straight to the seat command — leaving the user in the
+            // scene's default room with no indication anything had failed.
+            // Failures are now reported as failures.
+            Debug.LogError($"[FlutterBridge] Could not parse configuration JSON: {e.Message}");
+            NotifyFlutter("configuration_failed:parse_error");
             return;
         }
 
-        if (incoming == null)
+        if (payload == null || string.IsNullOrEmpty(payload.theatreId))
         {
-            Debug.LogWarning("[FlutterBridge] Configuration JSON parsed to null.");
-            NotifyFlutter("configuration_loaded");
+            Debug.LogError("[FlutterBridge] Configuration JSON parsed to null or had no theatreId.");
+            NotifyFlutter("configuration_failed:empty_payload");
             return;
         }
 
-        VenueParameters p = venueGenerator.Parameters;
-        p.roomWidth = incoming.roomWidth;
-        p.roomLength = incoming.roomLength;
-        p.roomHeight = incoming.roomHeight;
-        p.screenWidth = incoming.screenWidth;
-        p.screenHeight = incoming.screenHeight;
-        p.rows = incoming.rows;
-        p.seatsPerRow = incoming.seatsPerRow;
-        p.seatSpacing = incoming.seatSpacing;
-        p.rowSpacing = incoming.rowSpacing;
-        p.seatWidth = incoming.seatWidth;
-        p.firstRowDistanceFromScreen = incoming.firstRowDistanceFromScreen;
-        p.rowRisePerRow = incoming.rowRisePerRow;
+        venueGenerator.ApplyConfiguration(payload);
 
-        venueGenerator.Generate();
+        int seatCount = venueGenerator.GeneratedSeats != null ? venueGenerator.GeneratedSeats.Count : 0;
+        int speakerCount = SpatialAudioManager.Instance != null
+            ? SpatialAudioManager.Instance.SpeakerCount
+            : 0;
 
-        NotifyFlutter("configuration_loaded");
+        Debug.Log(
+            $"[FlutterBridge] Applied theatre '{payload.theatreName}' ({payload.theatreId}): " +
+            $"{seatCount} seats, {speakerCount} speakers.");
+
+        // The ack carries the theatre ID and the counts back, so Flutter (and
+        // anyone reading the browser console) can verify that the theatre
+        // Unity actually built is the theatre that was requested — rather
+        // than having to take a bare 'configuration_loaded' on faith.
+        NotifyFlutter($"configuration_loaded:{payload.theatreId}:{seatCount}:{speakerCount}");
+
+        // A theatre whose saved room cannot contain its saved seating is a
+        // configuration problem the owner needs to fix, not something to
+        // paper over. Reported AFTER the ack so it never blocks the user
+        // from entering the experience — the venue is still generated, at
+        // the owner's own dimensions.
+        RoomFitReport fit = RoomGenerator.LastFitReport;
+        if (!fit.Fits && fit.OwnerConfigured)
+        {
+            NotifyFlutter($"configuration_warning:room_too_small:{fit.Summary}");
+        }
     }
 
     /// <summary>
@@ -127,6 +165,41 @@ public class FlutterBridge : MonoBehaviour
     public void ExitExperienceFromFlutter()
     {
         ExperienceController.Instance?.ExitExperience();
+    }
+
+    /// <summary>
+    /// Called by Flutter's "Watch Trailer" button to play a direct video
+    /// file ON the generated cinema screen itself (see
+    /// TrailerScreenPlayer.cs for why this only ever receives a direct
+    /// file URL, never a YouTube/Vimeo link — Flutter's own full-screen
+    /// overlay handles those instead, and never calls this for them).
+    /// </summary>
+    public void LoadTrailer(string url)
+    {
+        Debug.Log($"[FlutterBridge] LoadTrailer received — url={url}");
+
+        if (TrailerScreenPlayer.Instance != null)
+        {
+            TrailerScreenPlayer.Instance.Play(url);
+        }
+        else
+        {
+            // Previously this only logged to the Unity console — Flutter
+            // would be left stuck on "Loading Trailer..." with literally no
+            // way to know why, since nothing ever reached it. This is one
+            // of the two places (the other being deep inside
+            // TrailerScreenPlayer.Play itself) execution could silently
+            // stall without this fix.
+            Debug.LogWarning("[FlutterBridge] LoadTrailer: no TrailerScreenPlayer in the scene.");
+            NotifyFlutter("trailer_error:no_trailer_player");
+        }
+    }
+
+    /// <summary>Called by Flutter when the person closes the in-scene trailer.</summary>
+    public void StopTrailer(string _)
+    {
+        Debug.Log("[FlutterBridge] StopTrailer received.");
+        TrailerScreenPlayer.Instance?.Stop();
     }
 
     /// <summary>

@@ -14,18 +14,24 @@ public static class ScreenGenerator
         screen.name = "Screen";
         screen.transform.SetParent(parent, false);
 
-        float centerY = p.screenHeightFromFloor + (p.screenHeight / 2f);
+        // Centre height, lateral offset and rotation all come from the
+        // theatre's own saved ScreenConfig when one was sent (see
+        // VenueParameters.ResolvedScreenCenterY / screenOffsetX /
+        // screenRotationY). They fall back to this scene's previous
+        // behaviour when nothing was sent, so a brand-new theatre with no
+        // saved screen still looks like it always did.
+        float centerY = p.ResolvedScreenCenterY;
+        Quaternion screenRotation = Quaternion.Euler(0f, p.screenRotationY, 0f);
 
-        screen.transform.localPosition = new Vector3(0, centerY, p.screenDistanceFromFrontWall);
+        screen.transform.localPosition = new Vector3(p.screenOffsetX, centerY, p.screenDistanceFromFrontWall);
+        screen.transform.localRotation = screenRotation;
         screen.transform.localScale = new Vector3(p.screenWidth, p.screenHeight, 0.05f);
 
         Material screenMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.9f, 0.9f, 0.95f) };
         // A real cinema screen is a matte, diffuse projection surface, not
-        // reflective — without this, the Standard shader's default glossy
-        // finish picks up a visible specular highlight "hot spot" from
-        // ScreenGlowLight (and any nearby ceiling lights), which shows up
-        // as a bright circle on the screen.
-        if (screenMaterial.HasProperty("_Glossiness")) screenMaterial.SetFloat("_Glossiness", 0.02f);
+        // reflective — setting glossiness and metallic to 0 eliminates specular
+        // hot spots from any ceiling lights in the auditorium.
+        if (screenMaterial.HasProperty("_Glossiness")) screenMaterial.SetFloat("_Glossiness", 0f);
         if (screenMaterial.HasProperty("_Metallic")) screenMaterial.SetFloat("_Metallic", 0f);
         if (screenMaterial.HasProperty("_EmissionColor"))
         {
@@ -47,7 +53,14 @@ public static class ScreenGenerator
         GameObject bezel = GameObject.CreatePrimitive(PrimitiveType.Cube);
         bezel.name = "ScreenBezel";
         bezel.transform.SetParent(parent, false);
-        bezel.transform.localPosition = new Vector3(0, centerY, p.screenDistanceFromFrontWall - 0.03f);
+        // Sits 3cm BEHIND the screen along the screen's own facing
+        // direction, so the bezel still frames the panel correctly once the
+        // screen is rotated rather than drifting out in front of it.
+        Quaternion screenRotation = Quaternion.Euler(0f, p.screenRotationY, 0f);
+        Vector3 behind = screenRotation * new Vector3(0f, 0f, -0.03f);
+        bezel.transform.localPosition =
+            new Vector3(p.screenOffsetX, centerY, p.screenDistanceFromFrontWall) + behind;
+        bezel.transform.localRotation = screenRotation;
         bezel.transform.localScale = new Vector3(p.screenWidth + 0.5f, p.screenHeight + 0.5f, 0.06f);
 
         Material bezelMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.03f, 0.03f, 0.035f) };
@@ -61,14 +74,19 @@ public static class ScreenGenerator
     {
         GameObject lightGo = new GameObject("ScreenGlowLight");
         lightGo.transform.SetParent(parent, false);
-        lightGo.transform.localPosition = new Vector3(0, centerY, p.screenDistanceFromFrontWall + 0.5f);
-        lightGo.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // aim back into the auditorium
+        Quaternion screenRotation = Quaternion.Euler(0f, p.screenRotationY, 0f);
+        // Position 1.0m in front of the screen (+Z along screen orientation)
+        Vector3 inFront = screenRotation * new Vector3(0f, 0f, 1.0f);
+        lightGo.transform.localPosition =
+            new Vector3(p.screenOffsetX, centerY, p.screenDistanceFromFrontWall) + inFront;
+        // Aim forward into the auditorium seating area (+Z) rather than backward into the screen.
+        lightGo.transform.localRotation = screenRotation;
 
         Light light = lightGo.AddComponent<Light>();
         light.type = LightType.Spot;
         light.color = new Color(0.75f, 0.82f, 1f);
         light.intensity = p.screenGlowIntensity;
         light.range = p.firstRowDistanceFromScreen + 8f;
-        light.spotAngle = 100f;
+        light.spotAngle = 90f;
     }
 }
