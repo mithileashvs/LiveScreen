@@ -31,6 +31,25 @@ extension EstimateProvenanceLabel on EstimateProvenance {
         return 'Unknown';
     }
   }
+
+  /// Priority: MEASURED (4) > ADMIN_MEASURED (3) > AI_ESTIMATED (2) > INFERRED (1) > UNKNOWN (0).
+  int get precedence {
+    switch (this) {
+      case EstimateProvenance.measured:
+        return 4;
+      case EstimateProvenance.adminMeasured:
+        return 3;
+      case EstimateProvenance.aiEstimated:
+        return 2;
+      case EstimateProvenance.inferred:
+        return 1;
+      case EstimateProvenance.unknown:
+        return 0;
+    }
+  }
+
+  bool isStrongerThan(EstimateProvenance other) => precedence > other.precedence;
+  bool isAtLeastAsStrongAs(EstimateProvenance other) => precedence >= other.precedence;
 }
 
 /// Generic wrapper for measurements and parameters that preserves uncertainty,
@@ -122,6 +141,20 @@ class Estimate<T> {
 
   /// Returns the value if known, otherwise returns [fallback].
   T valueOr(T fallback) => isKnown ? value! : fallback;
+
+  /// Returns whether this estimate takes priority over [other] according to
+  /// LiveScreen reconstruction precedence rules:
+  /// MEASURED > ADMIN_MEASURED > AI_ESTIMATED > INFERRED > UNKNOWN.
+  /// If both are AI_ESTIMATED, higher confidence takes precedence.
+  bool takesPrecedenceOver(Estimate<T> other) {
+    if (provenance.precedence > other.provenance.precedence) return true;
+    if (provenance.precedence < other.provenance.precedence) return false;
+    if (provenance == EstimateProvenance.aiEstimated &&
+        other.provenance == EstimateProvenance.aiEstimated) {
+      return (confidence ?? 0.0) >= (other.confidence ?? 0.0);
+    }
+    return true;
+  }
 
   Map<String, dynamic> toJson([dynamic Function(T value)? valueToJson]) => {
         'value': value == null

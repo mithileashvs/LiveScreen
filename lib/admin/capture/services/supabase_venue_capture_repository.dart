@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import 'venue_capture_repository.dart';
+import 'draft_to_theatre_mapper.dart' show UnreviewedDraftException;
 
 /// Supabase-backed implementation of [VenueCaptureRepository].
 ///
@@ -19,6 +20,24 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
       : _customClient = client;
 
   SupabaseClient get _client => _customClient ?? Supabase.instance.client;
+
+  String _resolveAdminUserId(String? explicitAdminUserId) {
+    // 1. Authenticated Supabase user ALWAYS takes precedence in production
+    final currentUserId = _client.auth.currentUser?.id;
+    if (currentUserId != null && currentUserId.trim().isNotEmpty) {
+      return currentUserId.trim();
+    }
+
+    // 2. Explicit test ID allowed ONLY when Supabase auth has no active session
+    // (e.g. Deterministic offline test harnesses and mock clients)
+    if (explicitAdminUserId != null && explicitAdminUserId.trim().isNotEmpty) {
+      return explicitAdminUserId.trim();
+    }
+
+    throw StateError(
+      'No authenticated user — cannot perform this operation without an authenticated admin identity.',
+    );
+  }
 
   @override
   Future<VenueCaptureSession> createSession(
@@ -108,6 +127,48 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
   }
 
   @override
+  Future<VenueCaptureSession> markDraftReviewed(
+    String sessionId, {
+    required String adminUserId,
+  }) async {
+    final session = await getSession(sessionId);
+    if (session == null) {
+      throw StateError('Capture session $sessionId not found.');
+    }
+    final draft = session.draft;
+    if (draft == null) {
+      throw StateError('Cannot review draft: session $sessionId has no candidate draft.');
+    }
+
+    final effectiveAdminId = _resolveAdminUserId(adminUserId);
+
+    final reviewedDraft = draft.copyWith(
+      isReviewed: true,
+      reviewedBy: effectiveAdminId,
+      reviewedAt: DateTime.now(),
+    );
+
+    final payload = <String, dynamic>{
+      'reconstruction_draft': reviewedDraft.toJson(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (session.state == CaptureState.readyForReview) {
+      final transitioned = session.transitionTo(CaptureState.reviewing);
+      payload['state'] = transitioned.state.name;
+    }
+
+    final response = await _client
+        .from('venue_capture_sessions')
+        .update(payload)
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+    return VenueCaptureSession.fromJson(response);
+  }
+
+  @override
   Future<VenueCaptureSession> confirmDraft(
     String sessionId,
     ReconstructionDraft draft, {
@@ -118,11 +179,14 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
       throw StateError('Capture session $sessionId not found.');
     }
 
-    final reviewedDraft = draft.copyWith(
-      isReviewed: true,
-      reviewedBy: adminUserId,
-      reviewedAt: DateTime.now(),
-    );
+    final effectiveAdminId = _resolveAdminUserId(adminUserId);
+
+    if (!draft.isReviewed) {
+      throw const UnreviewedDraftException(
+        'Cannot confirm unreviewed draft into canonical theatre configuration. '
+        'An administrator must review and approve the draft before confirmation.',
+      );
+    }
 
     // Verify transition to confirmed
     session.transitionTo(CaptureState.confirmed);
@@ -132,9 +196,13 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
         .from('venue_capture_sessions')
         .update({
           'state': CaptureState.confirmed.name,
-          'reconstruction_draft': reviewedDraft.toJson(),
+          'reconstruction_draft': draft.toJson(),
           'confirmed_at': now,
           'updated_at': now,
+          'metadata': {
+            ...session.metadata,
+            'confirmed_by': effectiveAdminId,
+          },
         })
         .eq('id', sessionId)
         .select()
@@ -183,6 +251,11 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
   }
 
   @override
+  Future<void> deleteEvidence(String mediaId) async {
+    await _client.from('venue_capture_media').delete().eq('id', mediaId);
+  }
+
+  @override
   Future<List<VenueCaptureRequest>> listRequests(String sessionId) async {
     final response = await _client
         .from('venue_capture_requests')
@@ -221,6 +294,7 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
   Future<VenueCaptureRequest> resolveRequest(
     String requestId, {
     required RequestStatus status,
+    String? fulfilledEvidenceId,
   }) async {
     final response = await _client
         .from('venue_capture_requests')
@@ -232,7 +306,11 @@ class SupabaseVenueCaptureRepository implements VenueCaptureRepository {
         .select()
         .single();
 
-    return VenueCaptureRequest.fromJson(response);
+    final parsed = VenueCaptureRequest.fromJson(response);
+    if (fulfilledEvidenceId != null) {
+      return parsed.copyWith(fulfilledEvidenceId: fulfilledEvidenceId);
+    }
+    return parsed;
   }
 
   @override

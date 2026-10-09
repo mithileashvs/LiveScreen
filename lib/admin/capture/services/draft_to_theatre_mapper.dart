@@ -92,6 +92,20 @@ class DraftToTheatreMapper {
       content: original.content,
       // Acoustics configuration is strictly preserved
       acoustics: original.acoustics,
+      // Seating is preserved by default from original
+      seats: original.seats
+          .map((s) => SeatConfig(
+                row: s.row,
+                number: s.number,
+                position: Position3(
+                  x: s.position.x,
+                  y: s.position.y,
+                  z: s.position.z,
+                ),
+                rotationY: s.rotationY,
+                category: s.category,
+              ))
+          .toList(),
       // Last seat layout parameters are preserved or updated below
       lastSeatLayout: original.lastSeatLayout,
     );

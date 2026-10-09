@@ -1,4 +1,4 @@
-enum CaptureJobStatus { pending, running, completed, failed, cancelled }
+enum CaptureJobStatus { pending, running, needsEvidence, completed, failed, cancelled }
 
 extension CaptureJobStatusLabel on CaptureJobStatus {
   String get label {
@@ -7,6 +7,8 @@ extension CaptureJobStatusLabel on CaptureJobStatus {
         return 'Pending';
       case CaptureJobStatus.running:
         return 'Running';
+      case CaptureJobStatus.needsEvidence:
+        return 'Needs Evidence';
       case CaptureJobStatus.completed:
         return 'Completed';
       case CaptureJobStatus.failed:
@@ -28,6 +30,9 @@ class VenueCaptureJob {
   final double progress; // 0.0 to 1.0
   final String? errorMessage;
   final String? workerId;
+  final int revision;
+  final List<String> requestedCapabilities;
+  final List<String> evidenceIds;
   final Map<String, dynamic> payload;
   final Map<String, dynamic>? resultSummary;
   final DateTime createdAt;
@@ -43,6 +48,9 @@ class VenueCaptureJob {
     this.progress = 0.0,
     this.errorMessage,
     this.workerId,
+    this.revision = 1,
+    this.requestedCapabilities = const [],
+    this.evidenceIds = const [],
     this.payload = const {},
     this.resultSummary,
     required this.createdAt,
@@ -59,6 +67,9 @@ class VenueCaptureJob {
         'progress': progress,
         'errorMessage': errorMessage,
         'workerId': workerId,
+        'revision': revision,
+        'requestedCapabilities': requestedCapabilities,
+        'evidenceIds': evidenceIds,
         'payload': payload,
         'resultSummary': resultSummary,
         'createdAt': createdAt.toIso8601String(),
@@ -82,6 +93,13 @@ class VenueCaptureJob {
       progress: rawProgress.clamp(0.0, 1.0),
       errorMessage: (json['errorMessage'] ?? json['error_message']) as String?,
       workerId: (json['workerId'] ?? json['worker_id']) as String?,
+      revision: (json['revision'] as num?)?.toInt() ?? 1,
+      requestedCapabilities: ((json['requestedCapabilities'] ?? json['requested_capabilities']) as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      evidenceIds: ((json['evidenceIds'] ?? json['evidence_ids']) as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
       payload: (json['payload'] as Map<String, dynamic>?) ?? const {},
       resultSummary: (json['resultSummary'] ?? json['result_summary']) as Map<String, dynamic>?,
       createdAt: DateTime.tryParse(

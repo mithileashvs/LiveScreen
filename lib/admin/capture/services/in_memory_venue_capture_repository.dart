@@ -1,5 +1,6 @@
 import '../models/models.dart';
 import 'venue_capture_repository.dart';
+import 'draft_to_theatre_mapper.dart' show UnreviewedDraftException;
 
 /// In-memory implementation of [VenueCaptureRepository] for fast, deterministic unit tests.
 class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
@@ -77,6 +78,39 @@ class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
       updatedAt: DateTime.now(),
     );
   }
+  @override
+  Future<VenueCaptureSession> markDraftReviewed(
+    String sessionId, {
+    required String adminUserId,
+  }) async {
+    final session = _sessions[sessionId];
+    if (session == null) {
+      throw StateError('Session $sessionId not found.');
+    }
+    final draft = session.draft;
+    if (draft == null) {
+      throw StateError('Cannot review draft: session $sessionId has no candidate draft.');
+    }
+    if (adminUserId.trim().isEmpty) {
+      throw StateError('Cannot review draft without an authenticated admin ID.');
+    }
+
+    final reviewedDraft = draft.copyWith(
+      isReviewed: true,
+      reviewedBy: adminUserId.trim(),
+      reviewedAt: DateTime.now(),
+    );
+
+    var updated = session.copyWith(
+      draft: reviewedDraft,
+      updatedAt: DateTime.now(),
+    );
+    if (session.state == CaptureState.readyForReview) {
+      updated = updated.transitionTo(CaptureState.reviewing);
+    }
+    _sessions[sessionId] = updated;
+    return updated;
+  }
 
   @override
   Future<VenueCaptureSession> confirmDraft(
@@ -89,14 +123,22 @@ class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
       throw StateError('Session $sessionId not found.');
     }
 
-    final reviewedDraft = draft.copyWith(
-      isReviewed: true,
-      reviewedBy: adminUserId,
-      reviewedAt: DateTime.now(),
-    );
+    if (!draft.isReviewed) {
+      throw const UnreviewedDraftException(
+        'Cannot confirm unreviewed draft into canonical theatre configuration. '
+        'An administrator must review and approve the draft before confirmation.',
+      );
+    }
+
+    if (adminUserId.trim().isEmpty) {
+      throw StateError('Cannot confirm draft without an authenticated admin ID.');
+    }
 
     final updated = session
-        .copyWith(draft: reviewedDraft)
+        .copyWith(
+          draft: draft,
+          updatedAt: DateTime.now(),
+        )
         .transitionTo(CaptureState.confirmed);
     _sessions[sessionId] = updated;
     return updated;
@@ -112,6 +154,13 @@ class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
     final list = _evidence.putIfAbsent(media.sessionId, () => []);
     list.add(media);
     return media;
+  }
+
+  @override
+  Future<void> deleteEvidence(String mediaId) async {
+    for (final list in _evidence.values) {
+      list.removeWhere((m) => m.id == mediaId);
+    }
   }
 
   @override
@@ -135,6 +184,7 @@ class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
   Future<VenueCaptureRequest> resolveRequest(
     String requestId, {
     required RequestStatus status,
+    String? fulfilledEvidenceId,
   }) async {
     for (final list in _requests.values) {
       final index = list.indexWhere((r) => r.id == requestId);
@@ -142,6 +192,7 @@ class InMemoryVenueCaptureRepository implements VenueCaptureRepository {
         final existing = list[index];
         final updated = existing.copyWith(
           status: status,
+          fulfilledEvidenceId: fulfilledEvidenceId,
           resolvedAt: DateTime.now(),
         );
         list[index] = updated;

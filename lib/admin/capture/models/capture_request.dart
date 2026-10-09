@@ -64,6 +64,9 @@ class VenueCaptureRequest {
   final DateTime createdAt;
   final DateTime? resolvedAt;
 
+  /// Identifier of the evidence item that fulfilled this request.
+  final String? fulfilledEvidenceId;
+
   const VenueCaptureRequest({
     required this.id,
     required this.sessionId,
@@ -75,6 +78,7 @@ class VenueCaptureRequest {
     this.relatedObservationIds = const [],
     this.priority = RequestPriority.medium,
     this.status = RequestStatus.pending,
+    this.fulfilledEvidenceId,
     required this.createdAt,
     this.resolvedAt,
   });
@@ -82,6 +86,7 @@ class VenueCaptureRequest {
   VenueCaptureRequest copyWith({
     RequestStatus? status,
     DateTime? resolvedAt,
+    String? fulfilledEvidenceId,
   }) {
     return VenueCaptureRequest(
       id: id,
@@ -94,8 +99,17 @@ class VenueCaptureRequest {
       relatedObservationIds: relatedObservationIds,
       priority: priority,
       status: status ?? this.status,
+      fulfilledEvidenceId: fulfilledEvidenceId ?? this.fulfilledEvidenceId,
       createdAt: createdAt,
       resolvedAt: resolvedAt ?? this.resolvedAt,
+    );
+  }
+
+  VenueCaptureRequest fulfill(String evidenceId, {DateTime? now}) {
+    return copyWith(
+      status: RequestStatus.fulfilled,
+      fulfilledEvidenceId: evidenceId,
+      resolvedAt: now ?? DateTime.now(),
     );
   }
 
@@ -110,6 +124,7 @@ class VenueCaptureRequest {
         'relatedObservationIds': relatedObservationIds,
         'priority': priority.name,
         'status': status.name,
+        'fulfilledEvidenceId': fulfilledEvidenceId,
         'createdAt': createdAt.toIso8601String(),
         'resolvedAt': resolvedAt?.toIso8601String(),
       };
@@ -143,6 +158,7 @@ class VenueCaptureRequest {
         (s) => s.name == rawStatus,
         orElse: () => RequestStatus.pending,
       ),
+      fulfilledEvidenceId: (json['fulfilledEvidenceId'] ?? json['fulfilled_evidence_id']) as String?,
       createdAt: DateTime.tryParse(
               (json['createdAt'] ?? json['created_at']) as String? ?? '') ??
           DateTime.now(),

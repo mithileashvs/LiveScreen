@@ -27,6 +27,14 @@ abstract class VenueCaptureRepository {
     ReconstructionDraft draft,
   );
 
+  /// Records administrator inspection and approval of the candidate draft.
+  /// Sets [draft.isReviewed = true], [draft.reviewedBy = adminUserId], and [draft.reviewedAt].
+  /// Transitions session state to [CaptureState.reviewing] if currently in [CaptureState.readyForReview].
+  Future<VenueCaptureSession> markDraftReviewed(
+    String sessionId, {
+    required String adminUserId,
+  });
+
   /// Confirms a reviewed draft and transitions the session to [CaptureState.confirmed].
   Future<VenueCaptureSession> confirmDraft(
     String sessionId,
@@ -39,6 +47,9 @@ abstract class VenueCaptureRepository {
 
   /// Records an uploaded evidence item (photo, video reference, or measurement).
   Future<VenueCaptureMedia> addEvidence(VenueCaptureMedia media);
+
+  /// Deletes an evidence item by its [mediaId].
+  Future<void> deleteEvidence(String mediaId);
 
   /// Lists all evidence recorded for [sessionId].
   Future<List<VenueCaptureMedia>> listEvidence(String sessionId);
@@ -53,6 +64,7 @@ abstract class VenueCaptureRepository {
   Future<VenueCaptureRequest> resolveRequest(
     String requestId, {
     required RequestStatus status,
+    String? fulfilledEvidenceId,
   });
 
   /// Lists all intermediate observations recorded for [sessionId].

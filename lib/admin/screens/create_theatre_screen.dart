@@ -183,10 +183,24 @@ class _CreateTheatreScreenState extends State<CreateTheatreScreen> {
                     ),
                   ),
                   onPressed: () {
+                    final baselineRoom = RoomConfig(
+                      width: double.tryParse(_widthController.text.trim()) ?? 20.0,
+                      length: double.tryParse(_lengthController.text.trim()) ?? 25.0,
+                      height: double.tryParse(_heightController.text.trim()) ?? 8.0,
+                    );
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => VenueCaptureScreen(
-                          theatreId: 'new-theatre-draft',
+                          theatreId: 'draft-${DateTime.now().millisecondsSinceEpoch}',
+                          isDraftTheatre: true,
+                          initialConfig: TheatreConfiguration(
+                            id: 'draft-temp',
+                            basicInfo: TheatreBasicInfo(
+                              name: _nameController.text.trim(),
+                              hallName: _hallController.text.trim(),
+                            ),
+                            room: baselineRoom,
+                          ),
                           onConfigurationUpdated: (updated) {
                             setState(() {
                               _widthController.text = updated.room.width.toString();

@@ -3,3 +3,8 @@ export 'in_memory_venue_capture_repository.dart';
 export 'supabase_venue_capture_repository.dart';
 export 'draft_to_theatre_mapper.dart';
 export 'coordinate_transformer.dart';
+export 'venue_analyzer.dart';
+export 'venue_assistant.dart';
+export 'draft_merge_engine.dart';
+export 'reference_reconstruction_worker.dart';
+export 'worker_venue_analyzer_adapter.dart';

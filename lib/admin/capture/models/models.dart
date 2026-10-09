@@ -6,3 +6,7 @@ export 'capture_observation.dart';
 export 'capture_job.dart';
 export 'reconstruction_draft.dart';
 export 'capture_session.dart';
+export 'venue_assistant_action.dart';
+export 'venue_assistant_message.dart';
+export 'venue_assistant_response.dart';
+export '../contracts/ai_worker_contracts.dart';

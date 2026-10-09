@@ -2,6 +2,7 @@ import '../models/estimate.dart';
 import '../../models/screen_config.dart' show Position3, ScreenType;
 import '../../models/seat_config.dart' show SeatCategory;
 import '../../models/speaker_model.dart' show SpeakerType;
+import '../../models/theatre_configuration.dart' show TheatreConfiguration;
 
 /// LiveScreen coordinate conventions as captured in the reconstruction draft.
 ///
@@ -221,6 +222,13 @@ class DraftSeatLattice {
   final Estimate<double> rowRisePerRow;
   final List<DraftSeat> seats;
 
+  /// Logical layout properties provided by admin or estimated by AI.
+  final List<int> aisleAfterSeats;
+  final int? blockCount;
+  final Map<int, int> rowSeatCounts;
+  final Set<String> removedSeats;
+  final Estimate<double> aisleWidth;
+
   const DraftSeatLattice({
     this.rows = const Estimate<int>.unknown(),
     this.seatsPerRow = const Estimate<int>.unknown(),
@@ -228,7 +236,40 @@ class DraftSeatLattice {
     this.rowSpacing = const Estimate<double>.unknown(),
     this.rowRisePerRow = const Estimate<double>.unknown(),
     this.seats = const [],
+    this.aisleAfterSeats = const [],
+    this.blockCount,
+    this.rowSeatCounts = const {},
+    this.removedSeats = const {},
+    this.aisleWidth = const Estimate<double>.unknown(),
   });
+
+  DraftSeatLattice copyWith({
+    Estimate<int>? rows,
+    Estimate<int>? seatsPerRow,
+    Estimate<double>? seatSpacing,
+    Estimate<double>? rowSpacing,
+    Estimate<double>? rowRisePerRow,
+    List<DraftSeat>? seats,
+    List<int>? aisleAfterSeats,
+    int? blockCount,
+    Map<int, int>? rowSeatCounts,
+    Set<String>? removedSeats,
+    Estimate<double>? aisleWidth,
+  }) {
+    return DraftSeatLattice(
+      rows: rows ?? this.rows,
+      seatsPerRow: seatsPerRow ?? this.seatsPerRow,
+      seatSpacing: seatSpacing ?? this.seatSpacing,
+      rowSpacing: rowSpacing ?? this.rowSpacing,
+      rowRisePerRow: rowRisePerRow ?? this.rowRisePerRow,
+      seats: seats ?? this.seats,
+      aisleAfterSeats: aisleAfterSeats ?? this.aisleAfterSeats,
+      blockCount: blockCount ?? this.blockCount,
+      rowSeatCounts: rowSeatCounts ?? this.rowSeatCounts,
+      removedSeats: removedSeats ?? this.removedSeats,
+      aisleWidth: aisleWidth ?? this.aisleWidth,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'rows': rows.toJson(),
@@ -237,10 +278,34 @@ class DraftSeatLattice {
         'rowSpacing': rowSpacing.toJson(),
         'rowRisePerRow': rowRisePerRow.toJson(),
         'seats': seats.map((s) => s.toJson()).toList(),
+        if (aisleAfterSeats.isNotEmpty) 'aisleAfterSeats': aisleAfterSeats,
+        if (blockCount != null) 'blockCount': blockCount,
+        if (rowSeatCounts.isNotEmpty)
+          'rowSeatCounts':
+              rowSeatCounts.map((k, v) => MapEntry(k.toString(), v)),
+        if (removedSeats.isNotEmpty) 'removedSeats': removedSeats.toList(),
+        'aisleWidth': aisleWidth.toJson(),
       };
 
   factory DraftSeatLattice.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const DraftSeatLattice();
+    final rawRowCounts = json['rowSeatCounts'] as Map<String, dynamic>?;
+    final rowSeatCounts = <int, int>{};
+    if (rawRowCounts != null) {
+      for (final entry in rawRowCounts.entries) {
+        final parsedKey = int.tryParse(entry.key);
+        final parsedVal = (entry.value as num?)?.toInt();
+        if (parsedKey != null && parsedVal != null) {
+          rowSeatCounts[parsedKey] = parsedVal;
+        }
+      }
+    }
+
+    final rawRemoved = json['removedSeats'] as List<dynamic>?;
+    final removedSeats = rawRemoved != null
+        ? rawRemoved.map((e) => e.toString()).toSet()
+        : const <String>{};
+
     return DraftSeatLattice(
       rows: json['rows'] != null
           ? Estimate<int>.fromJson(
@@ -275,9 +340,22 @@ class DraftSeatLattice {
       seats: (json['seats'] as List<dynamic>? ?? [])
           .map((e) => DraftSeat.fromJson(e as Map<String, dynamic>))
           .toList(),
+      aisleAfterSeats: (json['aisleAfterSeats'] as List<dynamic>? ?? [])
+          .map((e) => (e as num).toInt())
+          .toList(),
+      blockCount: json['blockCount'] as int?,
+      rowSeatCounts: rowSeatCounts,
+      removedSeats: removedSeats,
+      aisleWidth: json['aisleWidth'] != null
+          ? Estimate<double>.fromJson(
+              json['aisleWidth'] as Map<String, dynamic>,
+              (v) => (v as num).toDouble(),
+            )
+          : const Estimate<double>.unknown(),
     );
   }
 }
+
 
 /// Visual-only speaker detected from imagery.
 ///
@@ -383,22 +461,110 @@ class DraftLighting {
   }
 }
 
+/// Visual appearance and material specification for an individual auditorium wall surface.
+///
+/// Principles:
+/// 1. Each wall (front, left, right, rear) can independently represent color, material,
+///    and acoustic/decorative panel treatments.
+/// 2. If evidence is unavailable for a wall, estimates remain explicitly [Estimate.unknown].
+/// 3. Never invent RGB values, materials, or panel finishes without evidence.
+class DraftWallAppearance {
+  final Estimate<String> colorHex;
+  final Estimate<String> materialType; // e.g. 'acoustic_fabric_panel', 'wood_slat', 'matte_proscenium', 'curtain'
+  final Estimate<String> patternTreatment; // e.g. 'slatted_wood', 'fabric_baffles', 'smooth', 'diffuser_panel'
+
+  const DraftWallAppearance({
+    this.colorHex = const Estimate<String>.unknown(),
+    this.materialType = const Estimate<String>.unknown(),
+    this.patternTreatment = const Estimate<String>.unknown(),
+  });
+
+  bool get isKnown => colorHex.isKnown || materialType.isKnown || patternTreatment.isKnown;
+  bool get isUnknown => !isKnown;
+
+  Map<String, dynamic> toJson() => {
+        'colorHex': colorHex.toJson(),
+        'materialType': materialType.toJson(),
+        'patternTreatment': patternTreatment.toJson(),
+      };
+
+  factory DraftWallAppearance.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const DraftWallAppearance();
+    return DraftWallAppearance(
+      colorHex: json['colorHex'] != null
+          ? Estimate<String>.fromJson(
+              json['colorHex'] as Map<String, dynamic>,
+              (v) => v.toString(),
+            )
+          : const Estimate<String>.unknown(),
+      materialType: json['materialType'] != null
+          ? Estimate<String>.fromJson(
+              json['materialType'] as Map<String, dynamic>,
+              (v) => v.toString(),
+            )
+          : const Estimate<String>.unknown(),
+      patternTreatment: json['patternTreatment'] != null
+          ? Estimate<String>.fromJson(
+              json['patternTreatment'] as Map<String, dynamic>,
+              (v) => v.toString(),
+            )
+          : const Estimate<String>.unknown(),
+    );
+  }
+
+  DraftWallAppearance copyWith({
+    Estimate<String>? colorHex,
+    Estimate<String>? materialType,
+    Estimate<String>? patternTreatment,
+  }) {
+    return DraftWallAppearance(
+      colorHex: colorHex ?? this.colorHex,
+      materialType: materialType ?? this.materialType,
+      patternTreatment: patternTreatment ?? this.patternTreatment,
+    );
+  }
+}
+
 /// Visual material appearance and palette.
+///
+/// Stores both global room finishes (for backwards compatibility) and
+/// distinct per-wall appearance estimates for front, left, right, and rear walls.
+///
+/// Note: Canonical [TheatreConfiguration] and [RoomConfig] currently store
+/// metric envelope dimensions (width, length, height) without per-wall material
+/// channels. These fine-grained per-wall estimates are preserved in the
+/// [ReconstructionDraft] and draft review workflow without introducing breaking
+/// changes to live playback configurations or Unity bridge contracts.
 class DraftAppearance {
+  // Global palette fields preserved for backwards compatibility
   final Estimate<String> wallColorHex;
   final Estimate<String> carpetColorHex;
   final Estimate<String> wallMaterialType;
+
+  // Distinct per-wall appearance estimates
+  final DraftWallAppearance frontWall;
+  final DraftWallAppearance leftWall;
+  final DraftWallAppearance rightWall;
+  final DraftWallAppearance rearWall;
 
   const DraftAppearance({
     this.wallColorHex = const Estimate<String>.unknown(),
     this.carpetColorHex = const Estimate<String>.unknown(),
     this.wallMaterialType = const Estimate<String>.unknown(),
+    this.frontWall = const DraftWallAppearance(),
+    this.leftWall = const DraftWallAppearance(),
+    this.rightWall = const DraftWallAppearance(),
+    this.rearWall = const DraftWallAppearance(),
   });
 
   Map<String, dynamic> toJson() => {
         'wallColorHex': wallColorHex.toJson(),
         'carpetColorHex': carpetColorHex.toJson(),
         'wallMaterialType': wallMaterialType.toJson(),
+        'frontWall': frontWall.toJson(),
+        'leftWall': leftWall.toJson(),
+        'rightWall': rightWall.toJson(),
+        'rearWall': rearWall.toJson(),
       };
 
   factory DraftAppearance.fromJson(Map<String, dynamic>? json) {
@@ -422,6 +588,30 @@ class DraftAppearance {
               (v) => v.toString(),
             )
           : const Estimate<String>.unknown(),
+      frontWall: DraftWallAppearance.fromJson(json['frontWall'] as Map<String, dynamic>?),
+      leftWall: DraftWallAppearance.fromJson(json['leftWall'] as Map<String, dynamic>?),
+      rightWall: DraftWallAppearance.fromJson(json['rightWall'] as Map<String, dynamic>?),
+      rearWall: DraftWallAppearance.fromJson(json['rearWall'] as Map<String, dynamic>?),
+    );
+  }
+
+  DraftAppearance copyWith({
+    Estimate<String>? wallColorHex,
+    Estimate<String>? carpetColorHex,
+    Estimate<String>? wallMaterialType,
+    DraftWallAppearance? frontWall,
+    DraftWallAppearance? leftWall,
+    DraftWallAppearance? rightWall,
+    DraftWallAppearance? rearWall,
+  }) {
+    return DraftAppearance(
+      wallColorHex: wallColorHex ?? this.wallColorHex,
+      carpetColorHex: carpetColorHex ?? this.carpetColorHex,
+      wallMaterialType: wallMaterialType ?? this.wallMaterialType,
+      frontWall: frontWall ?? this.frontWall,
+      leftWall: leftWall ?? this.leftWall,
+      rightWall: rightWall ?? this.rightWall,
+      rearWall: rearWall ?? this.rearWall,
     );
   }
 }
@@ -545,6 +735,8 @@ class ReconstructionDraft {
     DraftLighting? lighting,
     DraftAppearance? appearance,
     List<DraftZone>? zones,
+    DraftPipelineMetadata? pipeline,
+    double? overallConfidence,
   }) {
     return ReconstructionDraft(
       id: id,
@@ -559,8 +751,8 @@ class ReconstructionDraft {
       lighting: lighting ?? this.lighting,
       appearance: appearance ?? this.appearance,
       zones: zones ?? this.zones,
-      pipeline: pipeline,
-      overallConfidence: overallConfidence,
+      pipeline: pipeline ?? this.pipeline,
+      overallConfidence: overallConfidence ?? this.overallConfidence,
       isReviewed: isReviewed ?? this.isReviewed,
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
@@ -619,4 +811,66 @@ class ReconstructionDraft {
           : null,
     );
   }
+
+  /// Creates a baseline [ReconstructionDraft] from an existing live [TheatreConfiguration].
+  /// Used by the AI Venue Assistant when configuring an existing theatre in the editor.
+  factory ReconstructionDraft.fromTheatreConfiguration(
+    TheatreConfiguration config, {
+    String? sessionId,
+  }) {
+    return ReconstructionDraft(
+      id: 'draft-${config.id}',
+      sessionId: sessionId ?? 'session-${config.id}',
+      theatreId: config.id,
+      createdAt: DateTime.now(),
+      coordinateFrame: const DraftCoordinateFrame(),
+      room: DraftRoomGeometry(
+        width: Estimate<double>.measured(config.room.width, source: 'theatre_config'),
+        length: Estimate<double>.measured(config.room.length, source: 'theatre_config'),
+        height: Estimate<double>.measured(config.room.height, source: 'theatre_config'),
+      ),
+      screen: DraftScreen(
+        width: Estimate<double>.measured(config.screen.width, source: 'theatre_config'),
+        height: Estimate<double>.measured(config.screen.height, source: 'theatre_config'),
+        position: Estimate<Position3>.measured(config.screen.position, source: 'theatre_config'),
+        rotationY: Estimate<double>.measured(config.screen.rotationY, source: 'theatre_config'),
+        type: Estimate<ScreenType>.measured(config.screen.type, source: 'theatre_config'),
+      ),
+      seating: DraftSeatLattice(
+        rows: config.lastSeatLayout != null
+            ? Estimate<int>.measured(config.lastSeatLayout!.rows, source: 'theatre_config')
+            : const Estimate<int>.unknown(),
+        seatsPerRow: config.lastSeatLayout != null
+            ? Estimate<int>.measured(config.lastSeatLayout!.seatsPerRow, source: 'theatre_config')
+            : const Estimate<int>.unknown(),
+        seatSpacing: config.lastSeatLayout != null
+            ? Estimate<double>.measured(config.lastSeatLayout!.seatSpacing, source: 'theatre_config')
+            : const Estimate<double>.unknown(),
+        rowSpacing: config.lastSeatLayout != null
+            ? Estimate<double>.measured(config.lastSeatLayout!.rowSpacing, source: 'theatre_config')
+            : const Estimate<double>.unknown(),
+        rowRisePerRow: config.lastSeatLayout != null
+            ? Estimate<double>.measured(config.lastSeatLayout!.rowElevation, source: 'theatre_config')
+            : const Estimate<double>.unknown(),
+        seats: config.seats.map((s) => DraftSeat(
+          id: s.id,
+          row: s.row,
+          number: s.number,
+          position: s.position,
+          category: s.category,
+        )).toList(),
+      ),
+      speakers: config.speakers.map((sp) => DraftVisualSpeaker(
+        id: sp.id,
+        name: sp.name,
+        position: sp.position,
+        rotationY: sp.rotationY,
+        visualCabinetType: sp.type,
+      )).toList(),
+      lighting: const DraftLighting(),
+      appearance: const DraftAppearance(),
+      isReviewed: false,
+    );
+  }
 }
+
